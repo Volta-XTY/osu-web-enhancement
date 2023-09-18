@@ -27,8 +27,8 @@ const svg_osu_miss = URL.createObjectURL(new Blob(
     <use href="#cross" fill="white" stroke="transparent" filter="url(#blur2)"/>
 </svg>`], {type: "image/svg+xml"}));
 const svg_green_tick = URL.createObjectURL(new Blob([
-`<svg viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
-    <polyline points="2,8 6,14 14,2" stroke="#62ee56" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+`<svg viewBox="0 0 18 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+    <polyline points="2,8 7,14 16,2" stroke="#62ee56" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 </svg>`], {type: "image/svg+xml"}));
 const inj_style = 
 `#osu-db-input{
@@ -159,14 +159,14 @@ div.bar__exp-info{
     border-radius: 10px 0px 0px 10px;
     background-size: cover;
     background-position-y: -100%;
-    mask-image: linear-gradient(to right, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0));
-    -webkit-mask-image: linear-gradient(to right, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0));
+    mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0));
+    -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0));
 }
 .beatmap-playcount__background{
     width: 100%;
     border-radius: 6px;
-    mask-image: linear-gradient(to right, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.05));
-    -webkit-mask-image: linear-gradient(to right, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.05));
+    mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.3));
+    -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.3));
 }
 .beatmap-playcount__info, .beatmap-playcount__detail-count{
     z-index: 1;
@@ -184,8 +184,11 @@ a.beatmap-download-link{
     margin: 0px 5px;
     color: hsl(var(--hsl-l1));
 }
-a.beatmap-download-link:hover{
+a.beatmap-download-link:hover, a.beatmap-pack-item-download-link span:hover{
     color: #fff;
+}
+a.beatmap-pack-item-download-link span{
+    color: hsl(var(--hsl-l1));
 }
 `;
 let scriptContent = 
@@ -469,6 +472,7 @@ class OsuDb{
 const beatmapsets = new Set();
 const beatmaps = new Set();
 const bmsReg = /https:\/\/osu\.ppy\.sh\/beatmapsets\/([0-9]+)/;
+const bmsdlReg = /https:\/\/osu\.ppy\.sh\/beatmapsets\/([0-9]+)\/download/;
 const bmReg = /https:\/\/osu\.ppy\.sh\/beatmapsets\/(?:[0-9]+)#(?:mania|osu|fruits|taiko)\/([0-9]+)/;
 const BeatmapsetRefresh = () => {
     for(const bm of window.osudb.beatmapArray){
@@ -537,13 +541,44 @@ const FilterBeatmapSet = () => {
         if(e && beatmapsets.has(Number(e[1]))){
             item.classList.add("owned-beatmap-link");
             if(item.nextElementSibling?.classList?.contains("beatmap-download-link")) item.nextElementSibling.remove();
-            item.after(HTML("img", {src: svg_green_tick, alt: "owned beatmap", class: "fa-green-tick"}));
+            const box = item.getBoundingClientRect();
+            const size = Math.round(box.height / 16 * 14);
+            const vert = Math.round(size * 4 / 14) / 2;
+            item.after(HTML("img", {src: svg_green_tick, title: "Owned", alt: "owned beatmap", style: `margin: 0px 5px; width: ${size}px; height: ${size}px; vertical-align: -${vert}px;`}));
         }else if(e && !item.nextElementSibling?.classList?.contains("beatmap-download-link")){
             item.after(
                 HTML("a", {class: "beatmap-download-link", href: `https://osu.ppy.sh/beatmapsets/${e[1]}/download`, download: ""},
-                    HTML("span", {class: "fas fa-file-download"})
+                    HTML("span", {class: "fas fa-file-download", title: "Download"})
                 )
             );
+        }
+    });
+    document.querySelectorAll("li.beatmap-pack-items__set").forEach(item => {
+        if(item.classList.contains("owned-beatmap-pack-item")) return;
+        const a = item.querySelector("a.beatmap-pack-items__link");
+        const e = bmsReg.exec(a.href);
+        if(e && beatmapsets.has(Number(e[1]))){
+            item.classList.add("owned-beatmap-pack-item");
+            const span = item.querySelector("span.fal");
+            span.setAttribute("title", "Owned");
+            span.dataset.origTitle = "owned";
+            span.setAttribute("class", "");
+            span.append(HTML("img", {src: svg_green_tick, alt: "owned beatmap", style: `width: 16px; height: 16px; vertical-align: -2px;`}));
+            const parent = item.querySelector(".beatmap-pack-item-download-link");
+            if(parent){
+                console.assert(parent.parentElement === item, "unexpected error occurred!");
+                item.insertBefore(span, parent);
+                parent.remove();
+            }
+        }else if(e){
+            const icon = item.querySelector(".beatmap-pack-items__icon");
+            icon.setAttribute("title", "Download");
+            icon.setAttribute("class", "fas fa-file-download beatmap-pack-items__icon");
+            if(icon.parentElement === item){
+                const dl = HTML("a", {class: "beatmap-pack-item-download-link", href: `https://osu.ppy.sh/beatmapsets/${e[1]}/download`, download: ""});
+                item.insertBefore(dl, icon);
+                dl.append(icon);
+            }
         }
     })
 };
@@ -673,7 +708,7 @@ const ListItemWorker = (ele, data) => {
                     HTML("span", {class: "mania-max"}, HTML("M")),
                     HTML("/"),
                     HTML("span", {class: "mania-300"}, HTML("300")),
-                    HTML("span", {class: "score-detail-data-text"}, HTML(`${M_300.toFixed(2)}`))
+                    HTML("span", {class: "score-detail-data-text"}, HTML(`${M_300 >= 1000 ? Math.round(M_300) : M_300.toPrecision(3)}`))
                 ),
                 HTML("span", {class: "score-detail score-detail-mania-max-200"},
                     HTML("span", {class: "mania-200"}, HTML("200")),
