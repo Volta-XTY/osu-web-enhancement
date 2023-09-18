@@ -1,16 +1,18 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.5
+// @version 0.5.1
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
+// @match https://lazer.ppy.sh/*
 // @icon http://ppy.sh/favicon.ico
 // @updateURL https://greasyfork.org/scripts/475417-osu-web-enhancement/code/osu!web%20enhancement.user.js
 // @grant none
 // @run-at document-end
 // ==/UserScript==
 console.log("osu!web enhancement loaded");
+const isLazer = document.location.origin.search("lazer") > 0;
 const svg_osu_miss = URL.createObjectURL(new Blob(
 [`<svg viewBox="0 0 128 128" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
     <filter id="blur">
@@ -105,13 +107,13 @@ const inj_style =
 .mania-max{
     animation: 0.16s infinite alternate rainbow;
 }
-.mania-300{
+.mania-300, .fruits-great, .taiko-great{
     color: #fbff00;
 }
 .osu-100{
     color: #67ff5b;
 }
-.mania-200{
+.mania-200, .taiko-ok{
     color: #6cd800;
 }
 .osu-300{
@@ -126,10 +128,13 @@ const inj_style =
 .osu-50{
     color: #ffbf00;
 }
-.mania-miss{
+.mania-miss, .fruits-miss, .taiko-miss{
     color: #cc2626;
 }
-.mania-max, .mania-300, .mania-200, .mania-100, .mania-50, .mania-miss, .osu-300, .osu-100, .osu-50, .osu-miss{
+.fruits-combo{
+    color: #fff;
+}
+.mania-max, .mania-300, .mania-200, .mania-100, .mania-50, .mania-miss, .osu-300, .osu-100, .osu-50, .osu-miss, .fruits-great, .taiko-great, .taiko-ok, .fruits-miss, .taiko-miss{
     font-weight: 600;
 }
 .score-detail-data-text{
@@ -197,8 +202,9 @@ let oldXHROpen = window.XMLHttpRequest.prototype.open;
 window.XMLHttpRequest.prototype.open = function() {
     this.addEventListener("load", function() {
         const url = this.responseURL;
-        const trreg = /https:\/\/osu\.ppy\.sh\/users\/([0-9]+)\/extra-pages\/(top_ranks|historical)\?mode=(osu|taiko|fruits|mania)/.exec(url);
-        const adreg = /https:\/\/osu\.ppy\.sh\/users\/([0-9]+)\/scores\/(firsts|best|recent|pinned)\?mode=(osu|taiko|fruits|mania)&limit=[0-9]*&offset=[0-9]*/.exec(url);
+        const org = /https:\/\/.*\.ppy\.sh/.exec(url);
+        const trreg = (new RegExp(org + "/users/([0-9]+)/extra-pages/(top_ranks|historical)\\?mode=(osu|taiko|fruits|mania)")).exec(url);
+        const adreg = (new RegExp(org + "/users/([0-9]+)/scores/(firsts|best|recent|pinned)\\?mode=(osu|taiko|fruits|mania)&limit=[0-9]*&offset=[0-9]*")).exec(url);
         let info;
         if(trreg) info = {
             type: trreg[2],
@@ -347,12 +353,13 @@ class OString{
     constructor(arr, iter){
         switch(arr[iter.nxtpos++]){
             case 0: break;
-            case 0x0b:
+            case 0x0b: {
                 const l = new ULEB128(arr, iter).value;
                 const bv = new Uint8Array(arr.buffer, iter.nxtpos, Number(l));
                 this.value = new TextDecoder().decode(bv);
                 iter.nxtpos += Number(l);
                 break;
+            }
             default: console.assert(false, `error occurred while parsing osu string with the first byte.`);
         }
     }
@@ -471,9 +478,10 @@ class OsuDb{
 };
 const beatmapsets = new Set();
 const beatmaps = new Set();
-const bmsReg = /https:\/\/osu\.ppy\.sh\/beatmapsets\/([0-9]+)/;
-const bmsdlReg = /https:\/\/osu\.ppy\.sh\/beatmapsets\/([0-9]+)\/download/;
-const bmReg = /https:\/\/osu\.ppy\.sh\/beatmapsets\/(?:[0-9]+)#(?:mania|osu|fruits|taiko)\/([0-9]+)/;
+const siteLnk = window.document.location.origin;
+const bmsReg = new RegExp(siteLnk + "/beatmapsets/([0-9]+)");
+const bmsdlReg = new RegExp(siteLnk + "/beatmapsets/([0-9]+)/download");
+const bmReg = new RegExp(siteLnk + "/beatmapsets/(?:[0-9]+)#(?:mania|osu|fruits|taiko)/([0-9]+)");
 const BeatmapsetRefresh = () => {
     for(const bm of window.osudb.beatmapArray){
         beatmaps.add(bm.difficultyID.value);
@@ -596,6 +604,8 @@ const AdjustStyle = (modeId, sectionName) => {
     let ll;
     switch(modeId){
         case 3: ll = [".mania-300", ".mania-200", ".mania-100", ".mania-50", ".mania-miss"]; break;
+        case 2: ll = [".fruits-great", ".fruits-miss", ".fruits-combo"]; break;
+        case 1: ll = [".taiko-great", ".taiko-ok", ".taiko-miss"]; break;
         case 0: ll = [".osu-300", ".osu-100", ".osu-50", ".osu-miss"]; break;
         default: ll = [];
     }
@@ -639,6 +649,8 @@ const ListItemWorker = (ele, data) => {
         pptext.nodeValue = Number(data.pp).toPrecision(5);
     }
     const left = ele.querySelector("div.play-detail__group.play-detail__group--top");
+    const bmpDtl = left.querySelector("div.play-detail__detail").querySelector("div.play-detail__beatmap-and-time");
+    bmpDtl.insertBefore(HTML("span", {class: "play-detail__beatmap"}, HTML("(" + data.beatmap.difficulty_rating + "*)")), bmpDtl.querySelector("span.play-detail__time"));
     const leftc = HTML("div", {class: "play-detail__group--background", style: `background-image: url(https://assets.ppy.sh/beatmaps/${data.beatmap.beatmapset_id}/covers/card@2x.jpg);`});
     left.parentElement.insertBefore(leftc, left);
     const detail= ele.querySelector("div.play-detail__score-detail-top-right");
@@ -649,7 +661,7 @@ const ListItemWorker = (ele, data) => {
     switch(data.ruleset_id){
         case 0:{
             du.replaceChildren(
-                HTML("span", {class: "play-detail__accuracy"}, HTML(`V1Acc: ${(data.accuracy * 100).toFixed(2)}%`)),
+                HTML("span", {class: "play-detail__accuracy"}, HTML((isLazer ? "Lazer " : "V1") + `Acc: ${(data.accuracy * 100).toFixed(2)}%`)),
             );
             const m_300 = HTML("span", {class: "score-detail score-detail-osu-300"}, 
                 HTML("span", {class: "osu-300"}, 
@@ -687,15 +699,49 @@ const ListItemWorker = (ele, data) => {
             break;
         }
         case 1:{
+            du.replaceChildren(
+                HTML("span", {class: "play-detail__accuracy"}, HTML((isLazer ? `Lazer ` : `V1`) + `Acc: ${(data.accuracy * 100).toFixed(2)}%`)),
+            );
+            db.replaceChildren(
+                HTML("span", {class: "score-detail score-detail-taiko-great"},
+                     HTML("span", {class: "taiko-great"}, HTML("Great")),
+                     HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.great))
+                ),
+                HTML("span", {class: "score-detail score-detail-taiko-ok"},
+                     HTML("span", {class: "taiko-ok"}, HTML("OK")),
+                     HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.ok))
+                ),
+                HTML("span", {class: "score-detail score-detail-fruits-combo"},
+                     HTML("span", {class: "taiko-miss"}, HTML("Miss")),
+                     HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.miss ?? 0))
+                )
+            );
             break;
         }
         case 2:{
+            du.replaceChildren(
+                HTML("span", {class: "play-detail__accuracy"}, HTML((isLazer ? `Lazer ` : `V1`) + `Acc: ${(data.accuracy * 100).toFixed(2)}%`)),
+            );
+            db.replaceChildren(
+                HTML("span", {class: "score-detail score-detail-fruits-great"},
+                     HTML("span", {class: "fruits-great"}, HTML("Great")),
+                     HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.great))
+                    ),
+                HTML("span", {class: "score-detail score-detail-fruits-miss"},
+                     HTML("span", {class: "fruits-miss"}, HTML("Miss")),
+                     HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.miss))
+                    ),
+                HTML("span", {class: "score-detail score-detail-fruits-combo"},
+                     HTML("span", {class: "fruits-combo"}, HTML("Max Combo")),
+                     HTML("span", {class: "score-detail-data-text"}, HTML(data.max_combo))
+                    )
+            );
             break;
         }
         case 3:{
             const v2acc = (320*data.statistics.perfect+300*data.statistics.great+200*data.statistics.good+100*data.statistics.ok+50*data.statistics.meh)/(320*(data.statistics.perfect+data.statistics.great+data.statistics.good+data.statistics.ok+data.statistics.meh+data.statistics.miss));
             du.replaceChildren(
-                HTML("span", {class: "play-detail__accuracy"}, HTML(`V1Acc: ${(data.accuracy * 100).toFixed(2)}%`)),
+                HTML("span", {class: "play-detail__accuracy"}, HTML((isLazer ? "Lazer " : "V1") + `Acc: ${(data.accuracy * 100).toFixed(2)}%`)),
                 HTML("span", {class: "play-detail__accuracy ppAcc"}, HTML(`PPAcc: ${(v2acc * 100).toFixed(2)}%`)),
             );
             if(data.pp){
