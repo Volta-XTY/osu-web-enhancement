@@ -158,7 +158,7 @@ const inj_style =
     color: rgb(142, 249, 241);
 }
 .play-detail__combo, .play-detail__Accuracy2, .play-detail__Accuracy{
-    margin-left: 10px;
+    margin-right: 13px;
 }
 .play-detail__combo{
     text-align: right;
@@ -489,12 +489,7 @@ class OsuDb{
         this.permission = new Int(arr, iter);
     }
 };
-const beatmapsets = {
-    _set: new Set(),
-    has(item){
-        return _set.has(item);
-    }
-};
+const beatmapsets = new Set();
 const beatmaps = new Set();
 const bmsReg = /https:\/\/(?:osu|lazer)\.ppy\.sh\/beatmapsets\/([0-9]+)/;
 const bmsdlReg = /https:\/\/(?:osu|lazer)\.ppy\.sh\/beatmapsets\/([0-9]+)\/download/;
@@ -688,8 +683,8 @@ const DiffToColour = (diff, stops = [0.1, 1.25, 2, 2.5, 3.3, 4.2, 4.9, 5.8, 6.7,
 }
 const ListItemWorker = (ele, data) => {
     const isLazer = window.location.hostname.split(".")[0] === "lazer"; // assume that hostname can only be osu.ppy.sh or lazer.ppy.sh
-    if(ele.classList.contains("improved")) return;
-    ele.classList.add("improved");
+    if(ele.getAttribute("improved") !== null) return;
+    ele.setAttribute("improved", "");
     if(data.pp){
         const pptext = ele.querySelector(".play-detail__pp > span").childNodes[0];
         pptext.nodeValue = Number(data.pp).toPrecision(5);
@@ -872,6 +867,8 @@ const OsuExpValToStr = (num) => {
     }
     else return `${num}`;
 }
+const messageCache = [];
+let lastUserId, lastModestr;
 const ImproveProfile = (message) => {
     let initData;
     if(window.location.toString() === lastLocationStr){
@@ -946,8 +943,8 @@ const OnBeatmapsetDownload = (message) => {
 }
 const ImproveBeatmapPlaycountItems = () => {
     for(const item of [...document.querySelectorAll("div.beatmap-playcount")]){
-        if(item.classList.contains("improved")) continue;
-        else item.classList.add("improved");
+        if(item.getAttribute("improved") !== null) continue;
+        item.setAttribute("improved", "");
         const a = item.querySelector("a");
         const bms = bmsReg.exec(a.href);
         if(!bms?.[1]) continue;
@@ -957,11 +954,35 @@ const ImproveBeatmapPlaycountItems = () => {
         else d.append(b);
     }
 }
+const CloseScoreCardPopup = () => {
+    document.querySelector("div.score-card-popup-window").remove();
+}
+const ShowScoreCardPopup = () => {
+    const p = document.querySelector("div.js-portal");
+    if(!p) return;
+    const bmsId = 
+    document.body.append(
+        HTML("div", {class: "score-card-popup-window"},
+            HTML("div", {class: "score-card-popup-menu"},
+                HTML("button", {class: "score-card-close-button", eventListener: {type: "click", listener: CloseScoreCardPopup}}),
+                HTML("button", {class: "score-card-copy-to-clipboard-button", ev}),
+            ),
+            HTML("div", {class: "score-card"},
+            )
+        )
+    );
+};
+const AddPopupButton = () => {
+    const p = document.querySelector("div.js-portal")?.querySelector("div.simple-menu");
+    if(!p || p.querySelector("button.score-card-popup-button")) return;
+    p.append(HTML("button", {class: "score-card-popup-button simple-menu__item", type: "button", eventListener: [{type: "click", listener: ShowScoreCardPopup}]}, HTML("Popup")));
+};
 const OnMutation = (mulist) => {
     mut.disconnect();
     PlaceSelectOsuDbButton();
     FilterBeatmapSet();
     ImproveBeatmapPlaycountItems();
+    //AddPopupButton();
     mut.observe(document, {childList: true, subtree: true});
 };
 const MessageFilter = (message) => {
@@ -992,3 +1013,4 @@ window.addEventListener("message", WindowMessageFilter);
 const mut = new MutationObserver(OnMutation);
 mut.observe(document, {childList: true, subtree: true});
 InsertStyleSheet();
+//{id, mode} -> (bmid -> record)
