@@ -646,9 +646,9 @@ const TopRanksWorker = (dataList, tabId, sectionName = "top_ranks") => {
     const rid = dataList[0].ruleset_id;
     let s = 0, e = 0;
     for(const ele of [...listEle.querySelectorAll(".play-detail.play-detail--highlightable")]){
-        const a = ele.querySelector("a.play-detail__title");
-        const bm = bmReg.exec(a.href)[1];
-        const i = dataList.findIndex(item => item.beatmap_id === Number(bm));
+        const a = ele.querySelector("time.js-timeago");
+        const t = new Date(a.getAttribute("datetime"));
+        const i = dataList.findIndex(item => Number(new Date(item.ended_at)) === Number(t));
         if(i !== -1){
             ListItemWorker(ele, dataList[i]);
             if(i === e) e++;
@@ -750,7 +750,15 @@ const ListItemWorker = (ele, data) => {
             break;
         }
         case 1:{
+            const cur = [data.statistics.great ?? 0, data.statistics.ok ?? 0, data.statistics.miss ?? 0];
+            const mx = cur[0] + cur[1] + cur[2];
             du.replaceChildren(
+                HTML("span", {class: "play-detail__combo", title: `Combo/Max Combo`},
+                     HTML("span", {class: `combo ${(data.max_combo === mx ? "legacy-perfect-combo" : "")}`}, HTML(`${data.max_combo}`)),
+                     HTML("/"),
+                     HTML("span", {class: "max-combo"}, HTML(`${mx}`)),
+                     HTML("x"),
+                ),
                 HTML("span", {class: "play-detail__Accuracy"}, HTML(`Acc: ${(data.accuracy * 100).toFixed(2)}%`)),
             );
             db.replaceChildren(
@@ -770,32 +778,55 @@ const ListItemWorker = (ele, data) => {
             break;
         }
         case 2:{
-            du.replaceChildren(
-                HTML("span", {class: "play-detail__Accuracy"}, HTML(`Acc: ${(data.accuracy * 100).toFixed(2)}%`)),
-            );
-            db.replaceChildren(
-                HTML("span", {class: "score-detail score-detail-fruits-300"},
-                     HTML("span", {class: "fruits-300"}, HTML("FRUIT")),
-                     HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.great ?? 0))
-                ),
-                HTML("span", {class: "score-detail score-detail-fruits-100"},
-                     HTML("span", {class: "fruits-100"}, HTML("tick")),
-                     HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.large_tick_hit ?? 0))
-                ),
-                HTML("span", {class: "score-detail score-detail-fruits-50-miss"},
-                     HTML("span", {class: "fruits-50-miss"}, HTML("miss")),
-                     HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.small_tick_miss ?? 0))
-                ),
-                HTML("span", {class: "score-detail score-detail-fruits-miss"},
-                     HTML("span", {class: "fruits-miss"}, HTML("MISS")),
-                     HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.miss ?? 0))
-                )
-                /*
-                ,HTML("span", {class: "score-detail score-detail-fruits-combo"},
-                     HTML("span", {class: "score-detail-data-text"}, HTML(`${data.max_combo}x/${data.maximum_statistics.great ?? 0 + data.maximum_statistics.large_tick_hit ?? 0}x`))
-                )
-                */
-            );
+            if (isLazer) {
+                const cur = [data.statistics.great ?? 0, data.statistics.large_tick_hit ?? 0, data.statistics.small_tick_hit ?? 0];
+                const mx = [data.maximum_statistics.great ?? 0, data.maximum_statistics.large_tick_hit ?? 0, data.maximum_statistics.small_tick_hit ?? 0];
+                du.replaceChildren(
+                    HTML("span", {class: "play-detail__combo", title: `Combo/Max Combo`}, 
+                         HTML("span", {class: `combo ${(data.max_combo === mx[0] + mx[1] ? "legacy-perfect-combo" : "")}`}, HTML(`${data.max_combo}`)),
+                         isLazer ? HTML("/") : null,
+                         isLazer ? HTML("span", {class: "max-combo"}, HTML(`${mx[0] + mx[1]}`)) : null,
+                         HTML("x"),
+                    ),
+                    HTML("span", {class: "play-detail__Accuracy"}, HTML(`Acc: ${(data.accuracy * 100).toFixed(2)}%`)),
+                );
+                db.replaceChildren(
+                    HTML("span", {class: "score-detail score-detail-fruits-300"},
+                         HTML("span", {class: "fruits-300"}, HTML("fruits")),
+                         HTML("span", {class: "score-detail-data-text"}, HTML(cur[0] + "/" + mx[0]))
+                    ),
+                    HTML("span", {class: "score-detail score-detail-fruits-100"},
+                         HTML("span", {class: "fruits-100"}, HTML("ticks")),
+                         HTML("span", {class: "score-detail-data-text"}, HTML(cur[1] + "/" + mx[1]))
+                    ),
+                    HTML("span", {class: "score-detail score-detail-fruits-50-miss"},
+                         HTML("span", {class: "fruits-50-miss"}, HTML("drops")),
+                         HTML("span", {class: "score-detail-data-text"}, HTML(cur[2] + "/" + mx[2]))
+                    )
+                );
+            } else {
+                du.replaceChildren(
+                    HTML("span", {class: "play-detail__Accuracy"}, HTML(`Acc: ${(data.accuracy * 100).toFixed(2)}%`)),
+                );
+                db.replaceChildren(
+                    HTML("span", {class: "score-detail score-detail-fruits-300"},
+                         HTML("span", {class: "fruits-300"}, HTML("FRUIT")),
+                         HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.great ?? 0))
+                    ),
+                    HTML("span", {class: "score-detail score-detail-fruits-100"},
+                         HTML("span", {class: "fruits-100"}, HTML("tick")),
+                         HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.large_tick_hit ?? 0))
+                    ),
+                    HTML("span", {class: "score-detail score-detail-fruits-50-miss"},
+                         HTML("span", {class: "fruits-50-miss"}, HTML("miss")),
+                         HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.small_tick_miss ?? 0))
+                    ),
+                    HTML("span", {class: "score-detail score-detail-fruits-miss"},
+                         HTML("span", {class: "fruits-miss"}, HTML("MISS")),
+                         HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.miss ?? 0))
+                    )
+                );
+            }
             break;
         }
         case 3:{
