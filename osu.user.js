@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.5.2
+// @version 0.5.3
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -603,7 +603,6 @@ const FilterBeatmapSet = () => {
     })
 };
 const AdjustStyle = (modeId, sectionName) => {
-    console.log("AdjustStyle");
     const styleSheetId = `userscript-generated-stylesheet-${sectionName}`;
     let e = document.getElementById(styleSheetId);
     if(!e){
@@ -647,8 +646,8 @@ const TopRanksWorker = (dataList, tabId, sectionName = "top_ranks") => {
     let s = 0, e = 0;
     for(const ele of [...listEle.querySelectorAll(".play-detail.play-detail--highlightable")]){
         const a = ele.querySelector("time.js-timeago");
-        const t = new Date(a.getAttribute("datetime"));
-        const i = dataList.findIndex(item => Number(new Date(item.ended_at)) === Number(t));
+        const t = a.getAttribute("datetime");
+        const i = dataList.findIndex(item => item.ended_at === t);
         if(i !== -1){
             ListItemWorker(ele, dataList[i]);
             if(i === e) e++;
