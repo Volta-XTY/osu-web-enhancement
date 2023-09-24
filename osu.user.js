@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.5.4
+// @version 0.5.5
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -566,7 +566,7 @@ const CheckForUpdate = () => {
 const AddMenu = () => {
     const menuId = "osu-web-enhancement-toolbar";
     if(document.getElementById(menuId)) return;
-    const logo = document.querySelector("div.nav2__col.nav2__col--logo");
+    const anc = document.querySelector("div.nav2__col.nav2__col--menu.js-react--quick-search-button");
     const i = HTML("input", {type: "file", id: "osu-db-input", accept: ".db", eventListener: [{
         type: "change",
         listener: SelectOsuDb,
@@ -574,25 +574,55 @@ const AddMenu = () => {
     }]});
     const menuClass = "simple-menu simple-menu--nav2 simple-menu--nav2-left-aligned simple-menu--nav2-transparent js-menu";
     const menuItemClass = "simple-menu__item u-section-community--before-bg-normal";
-    const menuTgtId = "nav2-menu-popup-osu-web-enhancement";
-    logo.insertAdjacentElement("afterend",
+    const menuTgtId = "osu-web-enhancement";
+    anc.insertAdjacentElement("beforebegin",
         HTML("div", {class: "nav2__col nav2__col--menu", id: menuId},
-            HTML("span", {class: "nav2__menu-link-main js-menu", "data-menu-target": menuTgtId, "data-menu-show-delay":"0"}, HTML("settings")),
+            HTML("div", {class: "nav2__menu-link-main js-menu", "data-menu-target": `nav2-menu-popup-${menuTgtId}`, "data-menu-show-delay":"0", style:"flex-direction: column; cursor: default;"}, 
+                HTML("span", {style: "flex-grow: 1;"}),
+                HTML("span", {style: "font-size: 10px;"}, HTML("osu!web")),
+                HTML("span", {style: "font-size: 10px;"}, HTML("enhancement")),
+                HTML("span", {style: "flex-grow: 1;"}),
+            ),
             HTML("div", {class: "nav2__menu-popup"},
-                HTML("div", {class: `${menuClass}`, "data-menu-id": menuTgtId, "data-visibility": "hidden"},
-                    HTML("div", {class: `${menuItemClass}`, id: "import-osu-db-button", eventListener: [{
+                HTML("div", {class: `${menuClass}`, "data-menu-id": `nav2-menu-popup-${menuTgtId}`, "data-visibility": "hidden"},
+                    HTML("div", {class: `${menuItemClass}`, style: "cursor: pointer;", id: "import-osu-db-button", eventListener: [{
                         type: "click",
                         listener: () => {if(i) i.click();},
                         options: false,
                     }]}, HTML("Import osu!.db")),
-                    HTML("div", {class: `${menuItemClass}`, eventListener: [{
+                    HTML("div", {class: `${menuItemClass}`, style: "cursor: pointer;", eventListener: [{
                         type: "click", 
                         listener: CheckForUpdate,
                     }]}, HTML("Check for update")),
                 ),
             )
         )
-    )
+    );
+    const mobMenuItmCls = "navbar-mobile-item__submenu-item js-click-menu--close";
+    const mob = document.querySelector(`div.mobile-menu__item.js-click-menu[data-click-menu-id="mobile-nav"]`);
+    mob.insertAdjacentElement("beforeend",
+        HTML("div", {class: "navbar-mobile-item"},
+            HTML("div", {class: "navbar-mobile-item__main js-click-menu", "data-click-menu-target": `nav-mobile-${menuTgtId}`, style: "cursor: pointer;"},
+                HTML("span", {class: "navbar-mobile-item__icon navbar-mobile-item__icon--closed"},
+                    HTML("i", {class: "fas fa-chevron-right"})
+                ),
+                HTML("span", {class: "navbar-mobile-item__icon navbar-mobile-item__icon--opened"},
+                    HTML("i", {class: "fas fa-chevron-down"})
+                ),
+                HTML("osu!web enhancement"),
+            ),
+            HTML("ul", {class: "navbar-mobile-item__submenu js-click-menu", "data-click-menu-id": `nav-mobile-${menuTgtId}`, "data-visibility": "hidden"},
+                HTML("li", {}, HTML("div", {class: mobMenuItmCls, style: "cursor: pointer;", eventListener: [{
+                    type: "click",
+                    listener: () => {if(i) i.click();},
+                }]}, HTML("Import osu!.db"))),
+                HTML("li", {}, HTML("div", {class: mobMenuItmCls, style: "cursor: pointer;", eventListener: [{
+                    type: "click",
+                    listener: CheckForUpdate,
+                }]}, HTML("Check for update"))),
+            )
+        )
+    );
     document.body.appendChild(i);
 };
 const FilterBeatmapSet = () => {
