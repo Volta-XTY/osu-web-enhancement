@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.5.3
+// @version 0.5.4
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -11,7 +11,10 @@
 // @grant none
 // @run-at document-end
 // ==/UserScript==
-console.log("osu!web enhancement loaded");
+const ShowPopup = (m, t = "info") => {
+    window.popup(m, t);
+    [["info", console.log], ["warning", console.warn], ["danger", console.error]].find(g => g[0] === t)[1](m);
+}
 const svg_osu_miss = URL.createObjectURL(new Blob(
 [`<svg viewBox="0 0 128 128" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
     <filter id="blur">
@@ -511,8 +514,8 @@ const NewOsuDb = (r) => {
             nxtpos: 0,
         };
         window.osudb = new OsuDb(result, iter);
-        console.assert(iter.nxtpos === length, "there are still remaining unread bytes, something may be wrong. iter: %o", iter);
-        console.log(`finished reading osu!.db in ${performance.now() - start} ms.`);
+        if(iter.nxtpos !== length) ShowPopup("There are still remaining unread bytes, something may be wrong.");
+        ShowPopup(`Finished reading osu!.db in ${performance.now() - start} ms.`);
         resolve();
     })
 };
@@ -532,21 +535,65 @@ const SelectOsuDb = (event) => {
     console.assert(l && l.length === 1, "No file or multiple files are selected.");
     ReadOsuDb(l[0]);
 };
-const PlaceSelectOsuDbButton = () => {
-    if(document.querySelector(".osu-db-button")) return;
+const CheckForUpdate = () => {
+    const verReg = /<dd class="script-show-version"><span>([0-9\.]+)<\/span><\/dd>/;
+    fetch("https://greasyfork.org/en/scripts/475417-osu-web-enhancement", {
+        credentials: "omit"
+    }).then(response => response.text()).then((html) => {
+        const ver = verReg.exec(html);
+        if(ver){
+            const result = (() => {
+                const verList = ver[1].split(".");
+                const thisVer = GM_info.script.version;
+                console.log(`latest version is: ${ver[1]}, current version is: ${thisVer}`);
+                const thisVerList = thisVer.split(".");
+                for(let i = 0; i < verList.length; i++){
+                    if(Number(verList[i]) > Number(thisVerList[i] ?? 0)) return true;
+                    else if(Number(verList[i]) < Number(thisVerList[i] ?? 0)) return false;
+                }
+                return false;
+            })();
+            if(result){
+                const a = HTML("a", {href: "https://greasyfork.org/scripts/475417-osu-web-enhancement/code/osu!web%20enhancement.user.js", download: "", style: "display:none;"});
+                a.click();
+            }
+            else{
+                ShowPopup("The lastest version is already installed!")
+            }
+        }
+    });
+};
+const AddMenu = () => {
+    const menuId = "osu-web-enhancement-toolbar";
+    if(document.getElementById(menuId)) return;
+    const logo = document.querySelector("div.nav2__col.nav2__col--logo");
     const i = HTML("input", {type: "file", id: "osu-db-input", accept: ".db", eventListener: [{
         type: "change",
         listener: SelectOsuDb,
         options: false,
     }]});
-    const d = HTML("div", {class: "osu-db-button nav2__col nav2__col--menu", eventListener: [{
-        type: "click",
-        listener: () => {if(i) i.click();},
-        options: false,
-    }]}, HTML("osu!.db"));
+    const menuClass = "simple-menu simple-menu--nav2 simple-menu--nav2-left-aligned simple-menu--nav2-transparent js-menu";
+    const menuItemClass = "simple-menu__item u-section-community--before-bg-normal";
+    const menuTgtId = "nav2-menu-popup-osu-web-enhancement";
+    logo.insertAdjacentElement("afterend",
+        HTML("div", {class: "nav2__col nav2__col--menu", id: menuId},
+            HTML("span", {class: "nav2__menu-link-main js-menu", "data-menu-target": menuTgtId, "data-menu-show-delay":"0"}, HTML("settings")),
+            HTML("div", {class: "nav2__menu-popup"},
+                HTML("div", {class: `${menuClass}`, "data-menu-id": menuTgtId, "data-visibility": "hidden"},
+                    HTML("div", {class: `${menuItemClass}`, id: "import-osu-db-button", eventListener: [{
+                        type: "click",
+                        listener: () => {if(i) i.click();},
+                        options: false,
+                    }]}, HTML("Import osu!.db")),
+                    HTML("div", {class: `${menuItemClass}`, eventListener: [{
+                        type: "click", 
+                        listener: CheckForUpdate,
+                    }]}, HTML("Check for update")),
+                ),
+            )
+        )
+    )
     document.body.appendChild(i);
-    const a = document.querySelector("div.nav2__col.nav2__col--menu");
-    a.parentElement.insertBefore(d, a);
 };
 const FilterBeatmapSet = () => {
     document.querySelectorAll(".beatmapsets__item").forEach((item) => {
@@ -1009,7 +1056,7 @@ const AddPopupButton = () => {
 };
 const OnMutation = (mulist) => {
     mut.disconnect();
-    PlaceSelectOsuDbButton();
+    AddMenu();
     FilterBeatmapSet();
     ImproveBeatmapPlaycountItems();
     //AddPopupButton();
@@ -1044,3 +1091,4 @@ const mut = new MutationObserver(OnMutation);
 mut.observe(document, {childList: true, subtree: true});
 InsertStyleSheet();
 //{id, mode} -> (bmid -> record)
+console.log("osu!web enhancement loaded");
