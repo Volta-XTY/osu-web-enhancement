@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.5.5
+// @version 0.5.6
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -514,7 +514,7 @@ const NewOsuDb = (r) => {
             nxtpos: 0,
         };
         window.osudb = new OsuDb(result, iter);
-        if(iter.nxtpos !== length) ShowPopup("There are still remaining unread bytes, something may be wrong.");
+        if(iter.nxtpos !== length) ShowPopup("There are still remaining unread bytes, something may be wrong.", "danger");
         ShowPopup(`Finished reading osu!.db in ${performance.now() - start} ms.`);
         resolve();
     })
@@ -753,7 +753,7 @@ const DiffToColour = (diff, stops = [0.1, 1.25, 2, 2.5, 3.3, 4.2, 4.9, 5.8, 6.7,
     const d = stops[r] - stops[r - 1];
     return `#${[[1, 3], [3, 5], [5, 7]]
         .map(_ => [Number.parseInt(vals[r].slice(..._), 16), Number.parseInt(vals[r-1].slice(..._), 16)])
-        .map(_ => Math.round((_[0] ** 2.2 * (diff - stops[r-1]) / d + _[1] ** 2.2 * (stops[r] - diff) / d) ** (1 / 2.2)).toString(16)) 
+        .map(_ => Math.round((_[0] ** 2.2 * (diff - stops[r-1]) / d + _[1] ** 2.2 * (stops[r] - diff) / d) ** (1 / 2.2)).toString(16).padStart(2, "0")) 
         .join("")
     }`;
 }
