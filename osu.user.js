@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.5.6
+// @version 0.5.7
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -762,8 +762,9 @@ const ListItemWorker = (ele, data) => {
     if(ele.getAttribute("improved") !== null) return;
     ele.setAttribute("improved", "");
     if(data.pp){
+        data.pp = Number(data.pp);
         const pptext = ele.querySelector(".play-detail__pp > span").childNodes[0];
-        pptext.nodeValue = Number(data.pp).toPrecision(5);
+        pptext.nodeValue = data.pp >= 1 ? data.pp.toPrecision(5) : (data.pp < 0.00005 ? 0 : data.pp.toFixed(4));
     }
     const left = ele.querySelector("div.play-detail__group.play-detail__group--top");
     const leftc = HTML("div", {class: "play-detail__group--background", style: `background-image: url(https://assets.ppy.sh/beatmaps/${data.beatmap.beatmapset_id}/covers/card@2x.jpg);`});
