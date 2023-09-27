@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.5.7
+// @version 0.6.0
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -190,6 +190,9 @@ div.bar__exp-info{
     mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0));
     -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0));
 }
+.play-detail.play-detail--highlightable.play-detail--pin-sortable.js-score-pin-sortable .play-detail__group--background{
+    left: 20px;
+}
 .beatmap-playcount__background{
     width: 100%;
     border-radius: 6px;
@@ -221,27 +224,29 @@ a.beatmap-pack-item-download-link span{
 `;
 let scriptContent = 
 String.raw`console.log("page script injected from osu!web enhancement");
-let oldXHROpen = window.XMLHttpRequest.prototype.open;
-window.XMLHttpRequest.prototype.open = function() {
-    this.addEventListener("load", function() {
-        const url = this.responseURL;
-        const trreg = /https:\/\/(?<subdomain>osu|lazer)\.ppy\.sh\/users\/(?<id>[0-9]+)\/extra-pages\/(?<type>top_ranks|historical)\?mode=(?<mode>osu|taiko|fruits|mania)/.exec(url);
-        const adreg = /https:\/\/(?<subdomain>osu|lazer)\.ppy\.sh\/users\/(?<id>[0-9]+)\/scores\/(?<type>firsts|best|recent|pinned)\?mode=(?<mode>osu|taiko|fruits|mania)&limit=[0-9]*&offset=[0-9]*/.exec(url);
-        let reg = trreg ?? (adreg ?? null);
-        if(!reg) return;
-        let info = {
-            type: reg.groups.type,
-            userId: Number(reg.groups.id),
-            mode: reg.groups.mode,
-            subdomain: reg.groups.subdomain,
-        };
-        const responseBody = this.responseText;
-        info.data = JSON.parse(responseBody);
-        info.id = "osu!web enhancement";
-        window.postMessage(info, "*");
-    });
-    return oldXHROpen.apply(this, arguments);
-};`;
+if(window.oldXHROpen === undefined){
+    window.oldXHROpen = window.XMLHttpRequest.prototype.open;
+    window.XMLHttpRequest.prototype.open = function() {
+        this.addEventListener("load", function() {
+            const url = this.responseURL;
+            const trreg = /https:\/\/(?<subdomain>osu|lazer)\.ppy\.sh\/users\/(?<id>[0-9]+)\/extra-pages\/(?<type>top_ranks|historical)\?mode=(?<mode>osu|taiko|fruits|mania)/.exec(url);
+            const adreg = /https:\/\/(?<subdomain>osu|lazer)\.ppy\.sh\/users\/(?<id>[0-9]+)\/scores\/(?<type>firsts|best|recent|pinned)\?mode=(?<mode>osu|taiko|fruits|mania)&limit=[0-9]*&offset=[0-9]*/.exec(url);
+            let reg = trreg ?? (adreg ?? null);
+            if(!reg) return;
+            let info = {
+                type: reg.groups.type,
+                userId: Number(reg.groups.id),
+                mode: reg.groups.mode,
+                subdomain: reg.groups.subdomain,
+            };
+            const responseBody = this.responseText;
+            info.data = JSON.parse(responseBody);
+            info.id = "osu!web enhancement";
+            window.postMessage(info, "*");
+        });
+        return oldXHROpen.apply(this, arguments);
+    };
+}`;
 const scriptId = "osu-web-enhancement-XHR-script";
 if(!document.querySelector(`script#${scriptId}`)){
     const script = document.createElement("script");
@@ -594,6 +599,7 @@ const AddMenu = () => {
                         type: "click", 
                         listener: CheckForUpdate,
                     }]}, HTML("Check for update")),
+                    HTML("a", {class: `${menuItemClass}`, style: "cursor: pointer;", href: "https://greasyfork.org/en/scripts/475417-osu-web-enhancement", target: "_blank"}, HTML("Go to GreasyFork page"))
                 ),
             )
         )
@@ -620,6 +626,7 @@ const AddMenu = () => {
                     type: "click",
                     listener: CheckForUpdate,
                 }]}, HTML("Check for update"))),
+                HTML("a", {class: `${mobMenuItmCls}`, style: "cursor: pointer;", href: "https://greasyfork.org/en/scripts/475417-osu-web-enhancement", target: "_blank"}, HTML("Go to GreasyFork page"))
             )
         )
     );
@@ -679,7 +686,7 @@ const FilterBeatmapSet = () => {
         }
     })
 };
-const AdjustStyle = (modeId, sectionName) => {
+const AdjustStyle = (modestr, sectionName) => {
     const styleSheetId = `userscript-generated-stylesheet-${sectionName}`;
     let e = document.getElementById(styleSheetId);
     if(!e){
@@ -691,11 +698,11 @@ const AdjustStyle = (modeId, sectionName) => {
     while(s.cssRules.length) s.deleteRule(0);
     const sectionSelector = `div.js-sortable--page[data-page-id="${sectionName}"]`;
     let ll = [];
-    switch(modeId){
-        case 3: ll = [".mania-300", ".mania-200", ".mania-100", ".mania-50", ".mania-miss"]; break;
-        case 2: ll = [".fruits-300", ".fruits-100", ".fruits-50-miss", ".fruits-miss"]; break;
-        case 1: ll = [".taiko-300", ".taiko-150", ".taiko-miss"]; break;
-        case 0: ll = [".osu-300", ".osu-100", ".osu-50", ".osu-miss"]; break;
+    switch(modestr){
+        case "mania": ll = [".mania-300", ".mania-200", ".mania-100", ".mania-50", ".mania-miss"]; break;
+        case "fruits": ll = [".fruits-300", ".fruits-100", ".fruits-50-miss", ".fruits-miss"]; break;
+        case "taiko": ll = [".taiko-300", ".taiko-150", ".taiko-miss"]; break;
+        case "osu": ll = [".osu-300", ".osu-100", ".osu-50", ".osu-miss"]; break;
     }
     ll.forEach((str) =>
         s.insertRule(
@@ -713,37 +720,32 @@ const AdjustStyle = (modeId, sectionName) => {
         )
     );
 };
-const TopRanksWorker = (dataList, tabId, sectionName = "top_ranks") => {
-    if(!dataList.length) return true;
-    const tabEle = document.querySelector(`div.js-sortable--page[data-page-id="${sectionName}"]`);
-    if(!tabEle) return false;
-    const listEle = tabEle.querySelectorAll(`.title.title--page-extra-small + div.play-detail-list.u-relative`)?.[tabId];
-    if(!listEle) return false;
-    const rid = dataList[0].ruleset_id;
-    let s = 0, e = 0;
-    for(const ele of [...listEle.querySelectorAll(".play-detail.play-detail--highlightable")]){
-        const a = ele.querySelector("time.js-timeago");
-        const t = a.getAttribute("datetime");
-        const i = dataList.findIndex(item => item.ended_at === t);
-        if(i !== -1){
-            ListItemWorker(ele, dataList[i]);
-            if(i === e) e++;
-            else if(i === s - 1) s--;
-            else if(i < s){
-                dataList.splice(s, e - s);
-                s = i, e = i + 1;
-            }
-            else if(i > e){
-                dataList.splice(s, e - s);
-                s = i - (e - s);
-                e = s + 1;
-            }
+const TopRanksWorker = (userId, modestr, addedNodes = [document.body]) => {
+    const isLazer = window.location.hostname.split(".")[0] === "lazer"; // assume that hostname can only be osu.ppy.sh or lazer.ppy.sh
+    const subdomain = isLazer ? "lazer": "osu";
+    let sectionNames = new Set();
+    const GetSection = (ele) => {
+        let count = 0;
+        while(ele){
+            if(ele.tagName === "DIV" && ele.className === "js-sortable--page") return ele.dataset.pageId;
+            ele = ele.parentElement;
+            count++;
+            if(count > 50) console.log(ele);
         }
-    }
-    dataList.splice(s, e - s);
-    if(dataList.length) return false;
-    AdjustStyle(rid, sectionName, tabId);
-    return true;
+    };
+    addedNodes.forEach((eles) => {
+        if(eles instanceof Element) eles.querySelectorAll(":scope div.play-detail.play-detail--highlightable").forEach((ele) => {
+            if(ele.getAttribute("improved") !== null) return;
+            const a = ele.querySelector(":scope time.js-timeago");
+            const t = a.getAttribute("datetime");
+            const data = messageCache.get(`${userId},${modestr},${subdomain},${t}`);
+            if(data){
+                sectionNames.add(GetSection(ele));
+                ListItemWorker(ele, data, isLazer);
+            }
+        });
+    });
+    sectionNames.forEach(sectionName => AdjustStyle(modestr, sectionName));
 };
 const DiffToColour = (diff, stops = [0.1, 1.25, 2, 2.5, 3.3, 4.2, 4.9, 5.8, 6.7, 7.7, 9], vals = ['#4290FB', '#4FC0FF', '#4FFFD5', '#7CFF4F', '#F6F05C', '#FF8068', '#FF4E6F', '#C645B8', '#6563DE', '#18158E', '#000000']) => {
     const len = stops.length;
@@ -756,9 +758,8 @@ const DiffToColour = (diff, stops = [0.1, 1.25, 2, 2.5, 3.3, 4.2, 4.9, 5.8, 6.7,
         .map(_ => Math.round((_[0] ** 2.2 * (diff - stops[r-1]) / d + _[1] ** 2.2 * (stops[r] - diff) / d) ** (1 / 2.2)).toString(16).padStart(2, "0")) 
         .join("")
     }`;
-}
-const ListItemWorker = (ele, data) => {
-    const isLazer = window.location.hostname.split(".")[0] === "lazer"; // assume that hostname can only be osu.ppy.sh or lazer.ppy.sh
+};
+const ListItemWorker = (ele, data, isLazer) => {
     if(ele.getAttribute("improved") !== null) return;
     ele.setAttribute("improved", "");
     if(data.pp){
@@ -768,7 +769,7 @@ const ListItemWorker = (ele, data) => {
     }
     const left = ele.querySelector("div.play-detail__group.play-detail__group--top");
     const leftc = HTML("div", {class: "play-detail__group--background", style: `background-image: url(https://assets.ppy.sh/beatmaps/${data.beatmap.beatmapset_id}/covers/card@2x.jpg);`});
-    left.parentElement.insertBefore(leftc, left);
+    left.insertAdjacentElement("beforebegin", leftc);
     const detail= ele.querySelector("div.play-detail__score-detail-top-right");
     const du = detail.children[0];
     if(!detail.children[1]) detail.append(HTML("div", {classList: "play-detail__pp-weight"}));
@@ -831,25 +832,25 @@ const ListItemWorker = (ele, data) => {
             const mx = cur[0] + cur[1] + cur[2];
             du.replaceChildren(
                 HTML("span", {class: "play-detail__combo", title: `Combo/Max Combo`},
-                     HTML("span", {class: `combo ${(data.max_combo === mx ? "legacy-perfect-combo" : "")}`}, HTML(`${data.max_combo}`)),
-                     HTML("/"),
-                     HTML("span", {class: "max-combo"}, HTML(`${mx}`)),
-                     HTML("x"),
+                    HTML("span", {class: `combo ${(data.max_combo === mx ? "legacy-perfect-combo" : "")}`}, HTML(`${data.max_combo}`)),
+                    HTML("/"),
+                    HTML("span", {class: "max-combo"}, HTML(`${mx}`)),
+                    HTML("x"),
                 ),
-                HTML("span", {class: "play-detail__Accuracy"}, HTML(`Acc: ${(data.accuracy * 100).toFixed(2)}%`)),
-            );
-            db.replaceChildren(
-                HTML("span", {class: "score-detail score-detail-taiko-300"},
-                     HTML("span", {class: "taiko-300"}, HTML("300")),
-                     HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.great ?? 0))
-                ),
-                HTML("span", {class: "score-detail score-detail-taiko-150"},
-                     HTML("span", {class: "taiko-150"}, HTML("150")),
-                     HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.ok ?? 0))
+            HTML("span", {class: "play-detail__Accuracy"}, HTML(`Acc: ${(data.accuracy * 100).toFixed(2)}%`)),
+        );
+        db.replaceChildren(
+            HTML("span", {class: "score-detail score-detail-taiko-300"},
+                    HTML("span", {class: "taiko-300"}, HTML("300")),
+                    HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.great ?? 0))
+            ),
+            HTML("span", {class: "score-detail score-detail-taiko-150"},
+                    HTML("span", {class: "taiko-150"}, HTML("150")),
+                    HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.ok ?? 0))
                 ),
                 HTML("span", {class: "score-detail score-detail-fruits-combo"},
-                     HTML("span", {class: "taiko-miss"}, HTML("miss")),
-                     HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.miss ?? 0))
+                    HTML("span", {class: "taiko-miss"}, HTML("miss")),
+                    HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.miss ?? 0))
                 )
             );
             break;
@@ -860,25 +861,25 @@ const ListItemWorker = (ele, data) => {
                 const mx = [data.maximum_statistics.great ?? 0, data.maximum_statistics.large_tick_hit ?? 0, data.maximum_statistics.small_tick_hit ?? 0];
                 du.replaceChildren(
                     HTML("span", {class: "play-detail__combo", title: `Combo/Max Combo`}, 
-                         HTML("span", {class: `combo ${(data.max_combo === mx[0] + mx[1] ? "legacy-perfect-combo" : "")}`}, HTML(`${data.max_combo}`)),
-                         isLazer ? HTML("/") : null,
-                         isLazer ? HTML("span", {class: "max-combo"}, HTML(`${mx[0] + mx[1]}`)) : null,
-                         HTML("x"),
+                        HTML("span", {class: `combo ${(data.max_combo === mx[0] + mx[1] ? "legacy-perfect-combo" : "")}`}, HTML(`${data.max_combo}`)),
+                        isLazer ? HTML("/") : null,
+                        isLazer ? HTML("span", {class: "max-combo"}, HTML(`${mx[0] + mx[1]}`)) : null,
+                        HTML("x"),
                     ),
                     HTML("span", {class: "play-detail__Accuracy"}, HTML(`Acc: ${(data.accuracy * 100).toFixed(2)}%`)),
                 );
                 db.replaceChildren(
                     HTML("span", {class: "score-detail score-detail-fruits-300"},
-                         HTML("span", {class: "fruits-300"}, HTML("fruits")),
-                         HTML("span", {class: "score-detail-data-text"}, HTML(cur[0] + "/" + mx[0]))
+                        HTML("span", {class: "fruits-300"}, HTML("fruits")),
+                        HTML("span", {class: "score-detail-data-text"}, HTML(cur[0] + "/" + mx[0]))
                     ),
                     HTML("span", {class: "score-detail score-detail-fruits-100"},
-                         HTML("span", {class: "fruits-100"}, HTML("ticks")),
-                         HTML("span", {class: "score-detail-data-text"}, HTML(cur[1] + "/" + mx[1]))
+                        HTML("span", {class: "fruits-100"}, HTML("ticks")),
+                        HTML("span", {class: "score-detail-data-text"}, HTML(cur[1] + "/" + mx[1]))
                     ),
                     HTML("span", {class: "score-detail score-detail-fruits-50-miss"},
-                         HTML("span", {class: "fruits-50-miss"}, HTML("drops")),
-                         HTML("span", {class: "score-detail-data-text"}, HTML(cur[2] + "/" + mx[2]))
+                        HTML("span", {class: "fruits-50-miss"}, HTML("drops")),
+                        HTML("span", {class: "score-detail-data-text"}, HTML(cur[2] + "/" + mx[2]))
                     )
                 );
             } else {
@@ -887,20 +888,20 @@ const ListItemWorker = (ele, data) => {
                 );
                 db.replaceChildren(
                     HTML("span", {class: "score-detail score-detail-fruits-300"},
-                         HTML("span", {class: "fruits-300"}, HTML("FRUIT")),
-                         HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.great ?? 0))
+                        HTML("span", {class: "fruits-300"}, HTML("FRUIT")),
+                        HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.great ?? 0))
                     ),
                     HTML("span", {class: "score-detail score-detail-fruits-100"},
-                         HTML("span", {class: "fruits-100"}, HTML("tick")),
-                         HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.large_tick_hit ?? 0))
+                        HTML("span", {class: "fruits-100"}, HTML("tick")),
+                        HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.large_tick_hit ?? 0))
                     ),
                     HTML("span", {class: "score-detail score-detail-fruits-50-miss"},
-                         HTML("span", {class: "fruits-50-miss"}, HTML("miss")),
-                         HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.small_tick_miss ?? 0))
+                        HTML("span", {class: "fruits-50-miss"}, HTML("miss")),
+                        HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.small_tick_miss ?? 0))
                     ),
                     HTML("span", {class: "score-detail score-detail-fruits-miss"},
-                         HTML("span", {class: "fruits-miss"}, HTML("MISS")),
-                         HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.miss ?? 0))
+                        HTML("span", {class: "fruits-miss"}, HTML("MISS")),
+                        HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.miss ?? 0))
                     )
                 );
             }
@@ -953,7 +954,6 @@ const ListItemWorker = (ele, data) => {
         }
     }
 }
-let lastLocationStr = "";
 let lastInitData;
 const OsuLevelToExp = (n) => {
     if(n <= 100) return 5000 / 3 * (4 * n ** 3 - 3 * n ** 2 - n) + 1.25 * 1.8 ** (n - 60);
@@ -975,62 +975,33 @@ const OsuExpValToStr = (num) => {
     }
     else return `${num}`;
 }
-const messageCache = [];
-let lastUserId, lastModestr;
-const ImproveProfile = (message) => {
-    let initData;
-    if(window.location.toString() === lastLocationStr){
-        initData = lastInitData;
-    }
-    else{
-        initData = JSON.parse(document.querySelector(".js-react--profile-page.osu-layout.osu-layout--full").dataset.initialData);
-        lastLocationStr = window.location.toString();
-        lastInitData = initData;
-    }
-    const userId = initData.user.id;
-    const modestr = initData.current_mode;
-    if(!(userId === message.userId && modestr === message.mode)) return;
-    const ttscore = initData.user.statistics.total_score;
-    const lvl = initData.user.statistics.level.current;
-    const upgradescore = Math.round(OsuLevelToExp(lvl + 1) - OsuLevelToExp(lvl));
-    const lvlscore = ttscore - Math.round(OsuLevelToExp(lvl));
-    document.querySelector("div.bar__text").textContent = `${OsuExpValToStr(lvlscore)}/${OsuExpValToStr(upgradescore)} (${(lvlscore/upgradescore * 100).toPrecision(3)}%)`;
-    let ppDiv;
-    document.querySelectorAll("div.value-display.value-display--plain").forEach((ele) => {
-        if(ele.querySelector("div.value-display__label").textContent === "pp") ppDiv = ele;
-    });
-    ppDiv.querySelector(".value-display__value > div").textContent = Number(initData.user.statistics.pp).toPrecision(6);
-    //document.querySelector(".value-display.value-display--plain.value-display--plain-wide").textContent = 
-    const obcb = () => {
-        ob.disconnect();
-        let result = true;
-        switch(message.type){
-            case "top_ranks":
-                result &&= TopRanksWorker(message.data.pinned.items, 0);
-                result &&= TopRanksWorker(message.data.best.items, 1);
-                result &&= TopRanksWorker(message.data.firsts.items, 2);
-                break;
-            case "firsts":
-                result &&= TopRanksWorker(message.data, 2);
-                break;
-            case "pinned":
-                result &&= TopRanksWorker(message.data, 0);
-                break;
-            case "best":
-                result &&= TopRanksWorker(message.data, 1);
-                break;
-            case "historical":
-                result &&= TopRanksWorker(message.data.recent.items, 0, "historical");
-                break;
-            case "recent":
-                result &&= TopRanksWorker(message.data, 0, "historical");
-                break;
+const messageCache = new Map();
+window.messageCache = messageCache;
+const profUrlReg = /https:\/\/(?:osu|lazer)\.ppy\.sh\/users\/[0-9]+(?:|\/osu|\/taiko|\/fruits|\/mania)/;
+const ImproveProfile = (mulist) => {
+    let initData, wloc = window.location.toString();
+    if(!profUrlReg.exec(wloc)) return;
+    initData = JSON.parse(document.querySelector(".js-react--profile-page.osu-layout.osu-layout--full").dataset.initialData);
+    const userId = initData.user.id, modestr = initData.current_mode;
+    if(initData !== lastInitData){
+        let ppDiv;
+        document.querySelectorAll("div.value-display.value-display--plain").forEach((ele) => {
+            if(ele.querySelector("div.value-display__label").textContent === "pp") ppDiv = ele;
+        });
+        if(ppDiv){
+            const ttscore = initData.user.statistics.total_score;
+            const lvl = initData.user.statistics.level.current;
+            const upgradescore = Math.round(OsuLevelToExp(lvl + 1) - OsuLevelToExp(lvl));
+            const lvlscore = ttscore - Math.round(OsuLevelToExp(lvl));
+            lastInitData = initData;
+            document.querySelector("div.bar__text").textContent = `${OsuExpValToStr(lvlscore)}/${OsuExpValToStr(upgradescore)} (${(lvlscore/upgradescore * 100).toPrecision(3)}%)`;
+            const _pp = initData.user.statistics.pp;
+            ppDiv.querySelector(".value-display__value > div").textContent = _pp >= 1 ? _pp.toPrecision(6) : (_pp < 0.000005 ? 0 : _pp.toFixed(5));
         }
-        if(!result) ob.observe(document, {subtree: true, childList: true});
-    };
-    const ob = new MutationObserver(obcb);
-    ob.observe(document, {subtree: true, childList: true});
-    obcb();
+    }
+    if(mulist !== undefined) mulist.forEach((record) => {
+        if(record.type === "childList" && record.addedNodes) TopRanksWorker(userId, modestr, record.addedNodes);
+    });
 }
 let wloc = "";
 const WindowLocationChanged = () => {
@@ -1068,7 +1039,6 @@ const CloseScoreCardPopup = () => {
 const ShowScoreCardPopup = () => {
     const p = document.querySelector("div.js-portal");
     if(!p) return;
-    const bmsId = 
     document.body.append(
         HTML("div", {class: "score-card-popup-window"},
             HTML("div", {class: "score-card-popup-menu"},
@@ -1090,17 +1060,33 @@ const OnMutation = (mulist) => {
     AddMenu();
     FilterBeatmapSet();
     ImproveBeatmapPlaycountItems();
+    ImproveProfile(mulist);
     //AddPopupButton();
     mut.observe(document, {childList: true, subtree: true});
 };
 const MessageFilter = (message) => {
+    info = `${message.userId},${message.mode},${message.subdomain}`;
     switch(message.type){
         case "beatmapset_download_complete": OnBeatmapsetDownload(message); break;
+        case "top_ranks":
+            [message.data.pinned.items, message.data.best.items, message.data.firsts.items].forEach(items => items.forEach(item => {
+                messageCache.set(`${info},${item.ended_at}`, item);
+            }));
+            TopRanksWorker(message.userId, message.mode);
+            break;
+        case "firsts": case "pinned": case "best": case "recent":
+            message.data.forEach(item => { messageCache.set(`${info},${item.ended_at}`, item); });
+            TopRanksWorker(message.userId, message.mode);
+            break;
+        case "historical":
+            message.data.recent.items.forEach(item => { messageCache.set(`${info},${item.ended_at}`, item); });
+            TopRanksWorker(message.userId, message.mode);
+            break;
     }
 }
 const WindowMessageFilter = (event) => {
     if(event.source === window && event?.data?.id === "osu!web enhancement"){
-        ImproveProfile(event.data);
+        MessageFilter(event.data);
     }
 }
 const OnClick = (event) => {
