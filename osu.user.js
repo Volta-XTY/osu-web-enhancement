@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.6.0
+// @version 0.6.0.1
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -568,6 +568,7 @@ const CheckForUpdate = () => {
         }
     });
 };
+window.addEventListener
 const AddMenu = () => {
     const menuId = "osu-web-enhancement-toolbar";
     if(document.getElementById(menuId)) return;
@@ -981,7 +982,9 @@ const profUrlReg = /https:\/\/(?:osu|lazer)\.ppy\.sh\/users\/[0-9]+(?:|\/osu|\/t
 const ImproveProfile = (mulist) => {
     let initData, wloc = window.location.toString();
     if(!profUrlReg.exec(wloc)) return;
-    initData = JSON.parse(document.querySelector(".js-react--profile-page.osu-layout.osu-layout--full").dataset.initialData);
+    const initDataEle = document.querySelector(".js-react--profile-page.osu-layout.osu-layout--full");
+    if(!initDataEle) return;
+    initData = JSON.parse(initDataEle.dataset.initialData);
     const userId = initData.user.id, modestr = initData.current_mode;
     if(initData !== lastInitData){
         let ppDiv;
