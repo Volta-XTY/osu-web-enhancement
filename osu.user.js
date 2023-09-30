@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.6.0.1
+// @version 0.6.1
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -104,7 +104,10 @@ const inj_style =
 }
 .play-detail__accuracy-and-weighted-pp{
     display: flex;
-    flex-direction: row-reverse;
+    flex-direction: row;
+}
+.play-detail__before{
+    flex-grow: 1;
 }
 .mania-max{
     animation: 0.16s infinite alternate rainbow;
@@ -190,6 +193,23 @@ div.bar__exp-info{
     mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0));
     -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0));
 }
+@media(max-width: 900px){
+    .play-detail__group--background, .beatmap-playcount__background{
+        background-position-y: 0%;
+        mask-image: linear-gradient(to bottom, #0007, #0004);
+        -webkit-mask-image: linear-gradient(to bottom, #0007, #0004);
+        width: 100%;
+    }
+    .lost-pp{
+        left: 3px;
+    }
+    .play-detail__group.play-detail__group--bottom{
+        z-index: 1;
+    }
+    .play-detail__before{
+        flex-grow: 0;
+    }
+}
 .play-detail.play-detail--highlightable.play-detail--pin-sortable.js-score-pin-sortable .play-detail__group--background{
     left: 20px;
 }
@@ -199,11 +219,8 @@ div.bar__exp-info{
     mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.3));
     -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.3));
 }
-.beatmap-playcount__info, .beatmap-playcount__detail-count{
+.beatmap-playcount__info, .beatmap-playcount__detail-count, .play-detail__group.play-detail__group--top *{
     z-index: 1;
-}
-.play-detail__group.play-detail__group--top *{
-    z-index: 3;
 }
 div.play-detail-list time.js-timeago, span.beatmap-playcount__mapper, span.beatmap-playcount__mapper > a{
     color: #ccc;
@@ -221,6 +238,19 @@ a.beatmap-download-link:hover, a.beatmap-pack-item-download-link span:hover{
 a.beatmap-pack-item-download-link span{
     color: hsl(var(--hsl-l1));
 }
+.play-detail.play-detail--highlightable.audio-player{
+    max-width: none;
+    height: unset;
+    padding: unset;
+    align-items: unset;
+}
+.play-detail.play-detail--highlightable.audio-player__button{
+    align-items: unset;
+    padding: unset;
+}
+.play-detail.play-detail--highlightable.audio-player__button:hover{
+    color: unset;
+}
 `;
 let scriptContent = 
 String.raw`console.log("page script injected from osu!web enhancement");
@@ -232,7 +262,9 @@ if(window.oldXHROpen === undefined){
             const trreg = /https:\/\/(?<subdomain>osu|lazer)\.ppy\.sh\/users\/(?<id>[0-9]+)\/extra-pages\/(?<type>top_ranks|historical)\?mode=(?<mode>osu|taiko|fruits|mania)/.exec(url);
             const adreg = /https:\/\/(?<subdomain>osu|lazer)\.ppy\.sh\/users\/(?<id>[0-9]+)\/scores\/(?<type>firsts|best|recent|pinned)\?mode=(?<mode>osu|taiko|fruits|mania)&limit=[0-9]*&offset=[0-9]*/.exec(url);
             let reg = trreg ?? (adreg ?? null);
-            if(!reg) return;
+            if(!reg){
+                const bmsreg = /https:\/\/(?:osu|lazer)\.ppy\.sh\/beatmapsets\/search\?/;
+            }
             let info = {
                 type: reg.groups.type,
                 userId: Number(reg.groups.id),
@@ -705,21 +737,60 @@ const AdjustStyle = (modestr, sectionName) => {
         case "taiko": ll = [".taiko-300", ".taiko-150", ".taiko-miss"]; break;
         case "osu": ll = [".osu-300", ".osu-100", ".osu-50", ".osu-miss"]; break;
     }
+    class FasterCalc{
+        _map = new Map();
+        Calculate = (ele) => {
+            const t = ele.textContent;
+            let w = 0, changed = false;
+            for(const c of t){
+                let wc = this._map.get(c);
+                if(!wc){
+                    ele.textContent = c;
+                    wc = ele.clientWidth;
+                    this._map.set(c, wc);
+                    changed = true;
+                }
+                w += wc;
+            }
+            if(changed) ele.textContent = t;
+            return w;
+        };
+    };
+    let past = performance.now(), curr;
+    let fc = new FasterCalc();
     ll.forEach((str) =>
         s.insertRule(
             `${sectionSelector} ${str} + .score-detail-data-text {
-                width: ${[...document.querySelectorAll(`${sectionSelector} ${str} + .score-detail-data-text`)].reduce((max, ele) => ele.clientWidth > max ? ele.clientWidth : max, 0) + 2}px;
+                width: ${[...document.querySelectorAll(`${sectionSelector} ${str} + .score-detail-data-text`)].reduce((max, ele) => { const w = fc.Calculate(ele); return w > max ? w : max }, 0) + 2}px;
             }` ,0
         )
     );
-    [".play-detail__pp", ".play-detail__combo", ".play-detail__Accuracy", ".play-detail__Accuracy2"].forEach((str) =>
+    curr = performance.now();
+    console.log(`AdjustStyle Stage 1: ${curr - past}ms`);
+    past = performance.now();
+    fc = new FasterCalc();
+    [".play-detail__combo", ".play-detail__Accuracy", ".play-detail__Accuracy2"].forEach((str) =>
         s.insertRule(
             `${sectionSelector} ${str}{
-                min-width: ${Math.ceil([...document.querySelectorAll(`${sectionSelector} ${str}`)].reduce((max, ele) => {const w = ele.getBoundingClientRect().width; return w > max ? w : max;}, 0)) + 1}px;
+                min-width: ${Math.ceil([...document.querySelectorAll(`${sectionSelector} ${str}`)].reduce((max, ele) => {const w = fc.Calculate(ele); return w > max ? w : max;}, 0)) + 1}px;
             }`
             ,0
         )
     );
+    curr = performance.now();
+    console.log(`AdjustStyle Stage 2: ${curr - past}ms`);
+    past = performance.now();
+    [".play-detail__pp"].forEach((str) =>
+        s.insertRule(
+            `${sectionSelector} ${str}{
+                min-width: ${Math.ceil([...document.querySelectorAll(`${sectionSelector} ${str}`)].reduce((max, ele) => {const w = ele.clientWidth; return w > max ? w : max;}, 0)) + 1}px;
+            }`
+            ,0
+        )
+    );
+    curr = performance.now();
+    console.log(`AdjustStyle Stage 3: ${curr - past}ms`);
+    past = performance.now();
 };
 const TopRanksWorker = (userId, modestr, addedNodes = [document.body]) => {
     const isLazer = window.location.hostname.split(".")[0] === "lazer"; // assume that hostname can only be osu.ppy.sh or lazer.ppy.sh
@@ -767,6 +838,7 @@ const ListItemWorker = (ele, data, isLazer) => {
         data.pp = Number(data.pp);
         const pptext = ele.querySelector(".play-detail__pp > span").childNodes[0];
         pptext.nodeValue = data.pp >= 1 ? data.pp.toPrecision(5) : (data.pp < 0.00005 ? 0 : data.pp.toFixed(4));
+        if(data.weight) pptext.title = `${data.weight.pp >= 1 ? data.weight.pp.toPrecision(5) : (data.weight.pp < 0.00005 ? 0 : data.weight.pp.toFixed(4))} of total pp`;
     }
     const left = ele.querySelector("div.play-detail__group.play-detail__group--top");
     const leftc = HTML("div", {class: "play-detail__group--background", style: `background-image: url(https://assets.ppy.sh/beatmaps/${data.beatmap.beatmapset_id}/covers/card@2x.jpg);`});
@@ -781,17 +853,28 @@ const ListItemWorker = (ele, data, isLazer) => {
         HTML("span", {class: "difficulty-badge__icon"}, HTML("span", {class: "fas fa-star"})),
         HTML("span", {class: "difficulty-badge__rating"}, HTML(`${data.beatmap.difficulty_rating.toFixed(2)}`))
     );
+    /*
+    const ic = ele;
+    ic.classList.add("audio-player", "js-audio--player");
+    ic.setAttribute("data-audio-url", `https://b.ppy.sh/preview/${data.beatmap.beatmapset_id}.mp3`)
+    ic.setAttribute("data-audio-state", "paused");
+    const gr = ele;
+    gr.classList.add("audio-player__button", "audio-player__button--play", "js-audio--play");
+    */
     bmName.parentElement.insertBefore(sr, bmName);
+    const bma = ele.querySelector("a.play-detail__title");
+    bma.onclick = (e) => {e.stopPropagation();};
     switch(data.ruleset_id){
         case 0:{
             du.replaceChildren(
+                HTML("span", {class: "play-detail__before"}),
+                HTML("span", {class: "play-detail__Accuracy", title: `${isLazer ? "V2" : "V1"} Accuracy`}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
                 HTML("span", {class: "play-detail__combo", title: `Combo${isLazer ? "/Max Combo" : ""}`}, 
                     HTML("span", {class: `combo ${isLazer ?(data.max_combo === (data.maximum_statistics.great ?? 0) + (data.maximum_statistics.legacy_combo_increase ?? 0) ? "legacy-perfect-combo" : ""):(data.legacy_perfect ? "legacy-perfect-combo" : "")}`}, HTML(`${data.max_combo}`)),
                     isLazer ? HTML("/") : null,
                     isLazer ? HTML("span", {class: "max-combo"}, HTML(`${(data.maximum_statistics.great ?? 0) + (data.maximum_statistics.legacy_combo_increase ?? 0)}`)) : null,
                     HTML("x"),
                 ),
-                HTML("span", {class: "play-detail__Accuracy", title: `${isLazer ? "V2" : "V1"} Accuracy`}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
             );
             const m_300 = HTML("span", {class: "score-detail score-detail-osu-300"}, 
                 HTML("span", {class: "osu-300"}, 
@@ -832,27 +915,28 @@ const ListItemWorker = (ele, data, isLazer) => {
             const cur = [data.statistics.great ?? 0, data.statistics.ok ?? 0, data.statistics.miss ?? 0];
             const mx = cur[0] + cur[1] + cur[2];
             du.replaceChildren(
+                HTML("span", {class: "play-detail__before"}),
+                HTML("span", {class: "play-detail__Accuracy"}, HTML(`Acc: ${(data.accuracy * 100).toFixed(2)}%`)),
                 HTML("span", {class: "play-detail__combo", title: `Combo/Max Combo`},
                     HTML("span", {class: `combo ${(data.max_combo === mx ? "legacy-perfect-combo" : "")}`}, HTML(`${data.max_combo}`)),
                     HTML("/"),
                     HTML("span", {class: "max-combo"}, HTML(`${mx}`)),
                     HTML("x"),
                 ),
-            HTML("span", {class: "play-detail__Accuracy"}, HTML(`Acc: ${(data.accuracy * 100).toFixed(2)}%`)),
-        );
-        db.replaceChildren(
-            HTML("span", {class: "score-detail score-detail-taiko-300"},
-                    HTML("span", {class: "taiko-300"}, HTML("300")),
-                    HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.great ?? 0))
-            ),
-            HTML("span", {class: "score-detail score-detail-taiko-150"},
-                    HTML("span", {class: "taiko-150"}, HTML("150")),
-                    HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.ok ?? 0))
+            );
+            db.replaceChildren(
+                HTML("span", {class: "score-detail score-detail-taiko-300"},
+                        HTML("span", {class: "taiko-300"}, HTML("300")),
+                        HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.great ?? 0))
+                ),
+                HTML("span", {class: "score-detail score-detail-taiko-150"},
+                        HTML("span", {class: "taiko-150"}, HTML("150")),
+                        HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.ok ?? 0))
                 ),
                 HTML("span", {class: "score-detail score-detail-fruits-combo"},
                     HTML("span", {class: "taiko-miss"}, HTML("miss")),
                     HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.miss ?? 0))
-                )
+                ),
             );
             break;
         }
@@ -861,13 +945,14 @@ const ListItemWorker = (ele, data, isLazer) => {
                 const cur = [data.statistics.great ?? 0, data.statistics.large_tick_hit ?? 0, data.statistics.small_tick_hit ?? 0];
                 const mx = [data.maximum_statistics.great ?? 0, data.maximum_statistics.large_tick_hit ?? 0, data.maximum_statistics.small_tick_hit ?? 0];
                 du.replaceChildren(
+                    HTML("span", {class: "play-detail__before"}),
+                    HTML("span", {class: "play-detail__Accuracy"}, HTML(`Acc: ${(data.accuracy * 100).toFixed(2)}%`)),
                     HTML("span", {class: "play-detail__combo", title: `Combo/Max Combo`}, 
                         HTML("span", {class: `combo ${(data.max_combo === mx[0] + mx[1] ? "legacy-perfect-combo" : "")}`}, HTML(`${data.max_combo}`)),
                         isLazer ? HTML("/") : null,
                         isLazer ? HTML("span", {class: "max-combo"}, HTML(`${mx[0] + mx[1]}`)) : null,
                         HTML("x"),
                     ),
-                    HTML("span", {class: "play-detail__Accuracy"}, HTML(`Acc: ${(data.accuracy * 100).toFixed(2)}%`)),
                 );
                 db.replaceChildren(
                     HTML("span", {class: "score-detail score-detail-fruits-300"},
@@ -885,6 +970,7 @@ const ListItemWorker = (ele, data, isLazer) => {
                 );
             } else {
                 du.replaceChildren(
+                    HTML("span", {class: "play-detail__before"}),
                     HTML("span", {class: "play-detail__Accuracy"}, HTML(`Acc: ${(data.accuracy * 100).toFixed(2)}%`)),
                 );
                 db.replaceChildren(
@@ -913,14 +999,15 @@ const ListItemWorker = (ele, data, isLazer) => {
             const MCombo = (data.maximum_statistics.perfect ?? 0) + (data.maximum_statistics.legacy_combo_increase ?? 0);
             const isMCombo = isLazer ? data.max_combo >= MCombo : data.legacy_perfect;
             du.replaceChildren(
+                HTML("span", {class: "play-detail__before"}),
+                HTML("span", {class: "play-detail__Accuracy2", title: `pp Accuracy`}, HTML(`${(v2acc * 100).toFixed(2)}%`)),
+                HTML("span", {class: "play-detail__Accuracy", title: `Score${isLazer ? "V2" : "V1"} Accuracy`}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
                 HTML("span", {class: "play-detail__combo", title: `Combo${isLazer ? "/Max Combo" : ""}`}, 
                     HTML("span", {class: `combo ${isMCombo ? "legacy-perfect-combo" : ""}`}, HTML(`${data.max_combo}`)),
                     isLazer ? HTML("/") : null,
                     isLazer ? HTML("span", {class: "max-combo"}, HTML(MCombo)) : null,
                     HTML("x"),
                 ),
-                HTML("span", {class: "play-detail__Accuracy", title: `Score${isLazer ? "V2" : "V1"} Accuracy`}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
-                HTML("span", {class: "play-detail__Accuracy2", title: `pp Accuracy`}, HTML(`${(v2acc * 100).toFixed(2)}%`)),
             );
             if(data.pp){
                 const lostpp = data.pp * (0.2 / (Math.min(Math.max(v2acc, 0.8), 1) - 0.8) - 1);
