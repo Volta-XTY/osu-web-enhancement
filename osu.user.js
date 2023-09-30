@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.6.1.2
+// @version 0.6.1.3
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -601,9 +601,18 @@ const CheckForUpdate = () => {
         }
     });
 };
-window.addEventListener
 const AddMenu = () => {
     const menuId = "osu-web-enhancement-toolbar";
+    if(!window.menuEventListener){
+        window.addEventListener("click", (ev) => {
+            const fid = ev.target?.dataset?.functionId;
+            if(fid) switch(fid){
+                case "import-osu-db-button": document.getElementById("osu-db-input")?.click(); break;
+                case "check-for-update-button": CheckForUpdate(); break;
+            }
+        });
+        window.menuEventListener = true;
+    }
     if(document.getElementById(menuId)) return;
     const anc = document.querySelector("div.nav2__col.nav2__col--menu.js-react--quick-search-button");
     const i = HTML("input", {type: "file", id: "osu-db-input", accept: ".db", eventListener: [{
@@ -624,15 +633,8 @@ const AddMenu = () => {
             ),
             HTML("div", {class: "nav2__menu-popup"},
                 HTML("div", {class: `${menuClass}`, "data-menu-id": `nav2-menu-popup-${menuTgtId}`, "data-visibility": "hidden"},
-                    HTML("div", {class: `${menuItemClass}`, style: "cursor: pointer;", id: "import-osu-db-button", eventListener: [{
-                        type: "click",
-                        listener: () => {if(i) i.click();},
-                        options: false,
-                    }]}, HTML("Import osu!.db")),
-                    HTML("div", {class: `${menuItemClass}`, style: "cursor: pointer;", eventListener: [{
-                        type: "click", 
-                        listener: CheckForUpdate,
-                    }]}, HTML("Check for update")),
+                    HTML("div", {class: `${menuItemClass}`, style: "cursor: pointer;", "data-function-id": "import-osu-db-button", }, HTML("Import osu!.db")),
+                    HTML("div", {class: `${menuItemClass}`, style: "cursor: pointer;", "data-function-id": "check-for-update-button"}, HTML("Check for update")),
                     HTML("a", {class: `${menuItemClass}`, style: "cursor: pointer;", href: "https://greasyfork.org/en/scripts/475417-osu-web-enhancement", target: "_blank"}, HTML("Go to GreasyFork page"))
                 ),
             )
@@ -652,14 +654,8 @@ const AddMenu = () => {
                 HTML("osu!web enhancement"),
             ),
             HTML("ul", {class: "navbar-mobile-item__submenu js-click-menu", "data-click-menu-id": `nav-mobile-${menuTgtId}`, "data-visibility": "hidden"},
-                HTML("li", {}, HTML("div", {class: mobMenuItmCls, style: "cursor: pointer;", eventListener: [{
-                    type: "click",
-                    listener: () => {if(i) i.click();},
-                }]}, HTML("Import osu!.db"))),
-                HTML("li", {}, HTML("div", {class: mobMenuItmCls, style: "cursor: pointer;", eventListener: [{
-                    type: "click",
-                    listener: CheckForUpdate,
-                }]}, HTML("Check for update"))),
+                HTML("li", {}, HTML("div", {class: mobMenuItmCls, style: "cursor: pointer;", "data-function-id": "import-osu-db-button",}, HTML("Import osu!.db"))),
+                HTML("li", {}, HTML("div", {class: mobMenuItmCls, style: "cursor: pointer;", "data-function-id": "check-for-update-button"}, HTML("Check for update"))),
                 HTML("a", {class: `${mobMenuItmCls}`, style: "cursor: pointer;", href: "https://greasyfork.org/en/scripts/475417-osu-web-enhancement", target: "_blank"}, HTML("Go to GreasyFork page"))
             )
         )
