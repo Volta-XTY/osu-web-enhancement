@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.6.1
+// @version 0.6.1.1
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -264,6 +264,7 @@ if(window.oldXHROpen === undefined){
             let reg = trreg ?? (adreg ?? null);
             if(!reg){
                 const bmsreg = /https:\/\/(?:osu|lazer)\.ppy\.sh\/beatmapsets\/search\?/;
+                return;
             }
             let info = {
                 type: reg.groups.type,
