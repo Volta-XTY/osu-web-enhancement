@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.6.1.1
+// @version 0.6.1.2
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -746,14 +746,17 @@ const AdjustStyle = (modestr, sectionName) => {
             for(const c of t){
                 let wc = this._map.get(c);
                 if(!wc){
+                    if(!changed) changed = ele.cloneNode(true);
                     ele.textContent = c;
                     wc = ele.clientWidth;
                     this._map.set(c, wc);
-                    changed = true;
                 }
                 w += wc;
             }
-            if(changed) ele.textContent = t;
+            if(changed){
+                ele.insertAdjacentElement("afterend", changed);
+                ele.remove();
+            }
             return w;
         };
     };
