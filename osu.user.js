@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.6.3
+// @version 0.6.3.1
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -797,7 +797,7 @@ const AdjustStyle = (modestr, sectionName) => {
 };
 const PPGiniIndex = () => {
     let vals = [...document.querySelectorAll(`div.js-sortable--page[data-page-id="top_ranks"] div.play-detail-list:nth-child(4) div.play-detail.play-detail--highlightable`)]
-    .map((ele) => {const ppele = ele.querySelector("div.play-detail__pp span"); return Number(ppele.title ?? ppele.dataset.origTitle);})
+    .map((ele) => {const ppele = ele.querySelector("div.play-detail__pp span"); return Number((ppele.title ? ppele.title : ppele.dataset.origTitle).replaceAll(",", ""))})
     .sort((a, b) => b - a);
     if(vals.length === 0) ShowPopup("Could not find best play data", "danger");
     const min = vals[vals.length - 1];
