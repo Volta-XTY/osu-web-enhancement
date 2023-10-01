@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.6.2
+// @version 0.6.3
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -34,7 +34,7 @@ const svg_green_tick = URL.createObjectURL(new Blob([
 `<svg viewBox="0 0 18 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
     <polyline points="2,8 7,14 16,2" stroke="#62ee56" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 </svg>`], {type: "image/svg+xml"}));
-const inj_style =
+const inj_style = 
 `#osu-db-input{
     display: none;
 }
@@ -150,7 +150,7 @@ const inj_style =
     height: 14px;
     bottom: 1px;
     position: relative;
-}
+} 
 .play-detail__Accuracy, .play-detail__Accuracy2, .combo, .max-combo, .play-detail__combo{
     display: inline-block;
     width: auto;
@@ -252,7 +252,7 @@ a.beatmap-pack-item-download-link span{
     color: unset;
 }
 `;
-let scriptContent =
+let scriptContent = 
 String.raw`console.log("page script injected from osu!web enhancement");
 if(window.oldXHROpen === undefined){
     window.oldXHROpen = window.XMLHttpRequest.prototype.open;
@@ -609,6 +609,7 @@ const AddMenu = () => {
             if(fid) switch(fid){
                 case "import-osu-db-button": document.getElementById("osu-db-input")?.click(); break;
                 case "check-for-update-button": CheckForUpdate(); break;
+                case "pp-gini-index-calculator": PPGiniIndex(); break;
             }
         });
         window.menuEventListener = true;
@@ -625,7 +626,7 @@ const AddMenu = () => {
     const menuTgtId = "osu-web-enhancement";
     anc.insertAdjacentElement("beforebegin",
         HTML("div", {class: "nav2__col nav2__col--menu", id: menuId},
-            HTML("div", {class: "nav2__menu-link-main js-menu", "data-menu-target": `nav2-menu-popup-${menuTgtId}`, "data-menu-show-delay":"0", style:"flex-direction: column; cursor: default;"},
+            HTML("div", {class: "nav2__menu-link-main js-menu", "data-menu-target": `nav2-menu-popup-${menuTgtId}`, "data-menu-show-delay":"0", style:"flex-direction: column; cursor: default;"}, 
                 HTML("span", {style: "flex-grow: 1;"}),
                 HTML("span", {style: "font-size: 10px;"}, HTML("osu!web")),
                 HTML("span", {style: "font-size: 10px;"}, HTML("enhancement")),
@@ -635,6 +636,7 @@ const AddMenu = () => {
                 HTML("div", {class: `${menuClass}`, "data-menu-id": `nav2-menu-popup-${menuTgtId}`, "data-visibility": "hidden"},
                     HTML("div", {class: `${menuItemClass}`, style: "cursor: pointer;", "data-function-id": "import-osu-db-button", }, HTML("Import osu!.db")),
                     HTML("div", {class: `${menuItemClass}`, style: "cursor: pointer;", "data-function-id": "check-for-update-button"}, HTML("Check for update")),
+                    HTML("div", {class: `${menuItemClass}`, style: "cursor: pointer;", "data-function-id": "pp-gini-index-calculator"}, HTML("Calculate pp Gini index")),
                     HTML("a", {class: `${menuItemClass}`, style: "cursor: pointer;", href: "https://greasyfork.org/en/scripts/475417-osu-web-enhancement", target: "_blank"}, HTML("Go to GreasyFork page"))
                 ),
             )
@@ -656,6 +658,7 @@ const AddMenu = () => {
             HTML("ul", {class: "navbar-mobile-item__submenu js-click-menu", "data-click-menu-id": `nav-mobile-${menuTgtId}`, "data-visibility": "hidden"},
                 HTML("li", {}, HTML("div", {class: mobMenuItmCls, style: "cursor: pointer;", "data-function-id": "import-osu-db-button",}, HTML("Import osu!.db"))),
                 HTML("li", {}, HTML("div", {class: mobMenuItmCls, style: "cursor: pointer;", "data-function-id": "check-for-update-button"}, HTML("Check for update"))),
+                HTML("li", {}, HTML("div", {class: mobMenuItmCls, style: "cursor: pointer;", "data-function-id": "pp-gini-index-calculator"}, HTML("Calculate pp Gini index"))),
                 HTML("a", {class: `${mobMenuItmCls}`, style: "cursor: pointer;", href: "https://greasyfork.org/en/scripts/475417-osu-web-enhancement", target: "_blank"}, HTML("Go to GreasyFork page"))
             )
         )
@@ -792,6 +795,17 @@ const AdjustStyle = (modestr, sectionName) => {
     console.log(`AdjustStyle Stage 3: ${curr - past}ms`);
     past = performance.now();
 };
+const PPGiniIndex = () => {
+    let vals = [...document.querySelectorAll(`div.js-sortable--page[data-page-id="top_ranks"] div.play-detail-list:nth-child(4) div.play-detail.play-detail--highlightable`)]
+    .map((ele) => {const ppele = ele.querySelector("div.play-detail__pp span"); return Number(ppele.title ?? ppele.dataset.origTitle);})
+    .sort((a, b) => b - a);
+    if(vals.length === 0) ShowPopup("Could not find best play data", "danger");
+    const min = vals[vals.length - 1];
+    vals = vals.map(val => val - min);
+    const SB = vals.reduce((sum, val) => sum + val, -(vals[0] / 2));
+    const SAB = vals[0] / 2 * vals.length;
+    ShowPopup(`Your pp Gini index of bp${vals.length} is ${(1 - SB/SAB).toPrecision(6)}.`);
+}
 const TopRanksWorker = (userId, modestr, addedNodes = [document.body]) => {
     const isLazer = window.location.hostname.split(".")[0] === "lazer"; // assume that hostname can only be osu.ppy.sh or lazer.ppy.sh
     const subdomain = isLazer ? "lazer": "osu";
@@ -827,11 +841,10 @@ const DiffToColour = (diff, stops = [0.1, 1.25, 2, 2.5, 3.3, 4.2, 4.9, 5.8, 6.7,
     const d = stops[r] - stops[r - 1];
     return `#${[[1, 3], [3, 5], [5, 7]]
         .map(_ => [Number.parseInt(vals[r].slice(..._), 16), Number.parseInt(vals[r-1].slice(..._), 16)])
-        .map(_ => Math.round((_[0] ** 2.2 * (diff - stops[r-1]) / d + _[1] ** 2.2 * (stops[r] - diff) / d) ** (1 / 2.2)).toString(16).padStart(2, "0"))
+        .map(_ => Math.round((_[0] ** 2.2 * (diff - stops[r-1]) / d + _[1] ** 2.2 * (stops[r] - diff) / d) ** (1 / 2.2)).toString(16).padStart(2, "0")) 
         .join("")
     }`;
 };
-let scr = {};
 const ListItemWorker = (ele, data, isLazer) => {
     if(ele.getAttribute("improved") !== null) return;
     ele.setAttribute("improved", "");
@@ -844,7 +857,7 @@ const ListItemWorker = (ele, data, isLazer) => {
     const left = ele.querySelector("div.play-detail__group.play-detail__group--top");
     const leftc = HTML("div", {class: "play-detail__group--background", style: `background-image: url(https://assets.ppy.sh/beatmaps/${data.beatmap.beatmapset_id}/covers/card@2x.jpg);`});
     left.insertAdjacentElement("beforebegin", leftc);
-    const detail = ele.querySelector("div.play-detail__score-detail-top-right");
+    const detail= ele.querySelector("div.play-detail__score-detail-top-right");
     const du = detail.children[0];
     if(!detail.children[1]) detail.append(HTML("div", {classList: "play-detail__pp-weight"}));
     const db = detail.children[1];
@@ -864,42 +877,37 @@ const ListItemWorker = (ele, data, isLazer) => {
     */
     bmName.parentElement.insertBefore(sr, bmName);
     const bma = ele.querySelector("a.play-detail__title");
-    const cnt = [data.beatmap.count_circles, data.beatmap.count_sliders, data.beatmap.count_spinners];
-    // const modeName = ["STD", "TAIKO", "CTB", "MANIA"];
-    const secToMin = (s) => `${Math.floor(s/60)}:${String(s%60).padStart(2, '0')}`;
-    // let scrMsg = `${modeName[data.ruleset_id]} ${data.beatmapset.title}\n[${data.beatmap.version}] ${secToMin(data.beatmap.total_length)}\n${data.total_score} ${data.rank} ${data.pp ? (data.pp >= 1 ? data.pp.toPrecision(5) : (data.pp < 0.00005 ? 0 : data.pp.toFixed(4))) : "-"}pp\n`;
-    let scrMsg = `${data.beatmapset.title}\n [${data.beatmap.version}] ${secToMin(data.beatmap.total_length)}\n${data.total_score} ${data.rank} ${data.pp ? (data.pp >= 1 ? data.pp.toPrecision(5) : (data.pp < 0.00005 ? 0 : data.pp.toFixed(4))) : "-"}pp\n`;
     bma.onclick = (e) => {e.stopPropagation();};
     switch(data.ruleset_id){
         case 0:{
             du.replaceChildren(
                 HTML("span", {class: "play-detail__before"}),
                 HTML("span", {class: "play-detail__Accuracy", title: `${isLazer ? "V2" : "V1"} Accuracy`}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
-                HTML("span", {class: "play-detail__combo", title: `Combo${isLazer ? "/Max Combo" : ""}`},
+                HTML("span", {class: "play-detail__combo", title: `Combo${isLazer ? "/Max Combo" : ""}`}, 
                     HTML("span", {class: `combo ${isLazer ?(data.max_combo === (data.maximum_statistics.great ?? 0) + (data.maximum_statistics.legacy_combo_increase ?? 0) ? "legacy-perfect-combo" : ""):(data.legacy_perfect ? "legacy-perfect-combo" : "")}`}, HTML(`${data.max_combo}`)),
                     isLazer ? HTML("/") : null,
                     isLazer ? HTML("span", {class: "max-combo"}, HTML(`${(data.maximum_statistics.great ?? 0) + (data.maximum_statistics.legacy_combo_increase ?? 0)}`)) : null,
                     HTML("x"),
                 ),
             );
-            const m_300 = HTML("span", {class: "score-detail score-detail-osu-300"},
-                HTML("span", {class: "osu-300"},
+            const m_300 = HTML("span", {class: "score-detail score-detail-osu-300"}, 
+                HTML("span", {class: "osu-300"}, 
                     HTML("300")
                 ),
                 HTML("span", {class: "score-detail-data-text"},
                     HTML(`${data.statistics.great + data.statistics.perfect}`)
                 )
             );
-            const s100 = HTML("span", {class: "score-detail score-detail-osu-100"},
-                HTML("span", {class: "osu-100"},
+            const s100 = HTML("span", {class: "score-detail score-detail-osu-100"}, 
+                HTML("span", {class: "osu-100"}, 
                     HTML("100")
                 ),
                 HTML("span", {class: "score-detail-data-text"},
                     HTML(`${data.statistics.ok + data.statistics.good}`)
                 )
             );
-            const s50 = HTML("span", {class: "score-detail score-detail-osu-50"},
-                HTML("span", {class: "osu-50"},
+            const s50 = HTML("span", {class: "score-detail score-detail-osu-50"}, 
+                HTML("span", {class: "osu-50"}, 
                     HTML("50")
                 ),
                 HTML("span", {class: "score-detail-data-text"},
@@ -915,12 +923,6 @@ const ListItemWorker = (ele, data, isLazer) => {
                 )
             );
             db.replaceChildren(m_300, s100, s50, s0);
-            scrMsg += `${data.statistics.great + data.statistics.perfect}-${data.statistics.ok + data.statistics.good}-${data.statistics.meh}-${data.statistics.miss} ${data.max_combo}`;
-            if (isLazer) {
-                scrMsg += `${(data.maximum_statistics.great ?? 0) + (data.maximum_statistics.legacy_combo_increase ?? 0)}`;
-            }
-            scrMsg += "x\n";
-            scrMsg += `⭕ ${cnt[0]} 🌡️ ${cnt[1]} 🔄 ${cnt[2]}\n`;
             break;
         }
         case 1:{
@@ -928,7 +930,7 @@ const ListItemWorker = (ele, data, isLazer) => {
             const mx = cur[0] + cur[1] + cur[2];
             du.replaceChildren(
                 HTML("span", {class: "play-detail__before"}),
-                HTML("span", {class: "play-detail__Accuracy"}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
+                HTML("span", {class: "play-detail__Accuracy"}, HTML(`Acc: ${(data.accuracy * 100).toFixed(2)}%`)),
                 HTML("span", {class: "play-detail__combo", title: `Combo/Max Combo`},
                     HTML("span", {class: `combo ${(data.max_combo === mx ? "legacy-perfect-combo" : "")}`}, HTML(`${data.max_combo}`)),
                     HTML("/"),
@@ -950,8 +952,6 @@ const ListItemWorker = (ele, data, isLazer) => {
                     HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.miss ?? 0))
                 ),
             );
-            scrMsg += `${data.statistics.great}-${data.statistics.ok}-${data.statistics.miss} ${data.max_combo}/${mx}x\n`;
-            scrMsg += `🥁 ${cnt[0]} 🌡️ ${cnt[1]} 🍥 ${cnt[2]}\n`;
             break;
         }
         case 2:{
@@ -960,8 +960,8 @@ const ListItemWorker = (ele, data, isLazer) => {
                 const mx = [data.maximum_statistics.great ?? 0, data.maximum_statistics.large_tick_hit ?? 0, data.maximum_statistics.small_tick_hit ?? 0];
                 du.replaceChildren(
                     HTML("span", {class: "play-detail__before"}),
-                    HTML("span", {class: "play-detail__Accuracy"}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
-                    HTML("span", {class: "play-detail__combo", title: `Combo/Max Combo`},
+                    HTML("span", {class: "play-detail__Accuracy"}, HTML(`Acc: ${(data.accuracy * 100).toFixed(2)}%`)),
+                    HTML("span", {class: "play-detail__combo", title: `Combo/Max Combo`}, 
                         HTML("span", {class: `combo ${(data.max_combo === mx[0] + mx[1] ? "legacy-perfect-combo" : "")}`}, HTML(`${data.max_combo}`)),
                         isLazer ? HTML("/") : null,
                         isLazer ? HTML("span", {class: "max-combo"}, HTML(`${mx[0] + mx[1]}`)) : null,
@@ -982,12 +982,10 @@ const ListItemWorker = (ele, data, isLazer) => {
                         HTML("span", {class: "score-detail-data-text"}, HTML(cur[2] + "/" + mx[2]))
                     )
                 );
-                scrMsg += `${cur[0]}/${mx[0]}-${cur[1]}/${mx[1]}-${cur[2]}/${mx[2]} ${data.max_combo}/${mx[0] + mx[1]}x\n`;
-                scrMsg += `🍎 ${cnt[0]} 💧 ${cnt[1]} 🍌 ${cnt[2]}\n`;
             } else {
                 du.replaceChildren(
                     HTML("span", {class: "play-detail__before"}),
-                    HTML("span", {class: "play-detail__Accuracy"}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
+                    HTML("span", {class: "play-detail__Accuracy"}, HTML(`Acc: ${(data.accuracy * 100).toFixed(2)}%`)),
                 );
                 db.replaceChildren(
                     HTML("span", {class: "score-detail score-detail-fruits-300"},
@@ -1007,8 +1005,6 @@ const ListItemWorker = (ele, data, isLazer) => {
                         HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.miss ?? 0))
                     )
                 );
-                scrMsg += `${data.statistics.great ?? 0}-${data.statistics.large_tick_hit ?? 0}-${data.statistics.small_tick_miss ?? 0}-${data.statistics.miss ?? 0} ${data.max_combo}\n`;
-                scrMsg += `🍎 ${cnt[0]} 💧 ${cnt[1]} 🍌 ${cnt[2]}\n`;
             }
             break;
         }
@@ -1020,7 +1016,7 @@ const ListItemWorker = (ele, data, isLazer) => {
                 HTML("span", {class: "play-detail__before"}),
                 HTML("span", {class: "play-detail__Accuracy2", title: `pp Accuracy`}, HTML(`${(v2acc * 100).toFixed(2)}%`)),
                 HTML("span", {class: "play-detail__Accuracy", title: `Score${isLazer ? "V2" : "V1"} Accuracy`}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
-                HTML("span", {class: "play-detail__combo", title: `Combo${isLazer ? "/Max Combo" : ""}`},
+                HTML("span", {class: "play-detail__combo", title: `Combo${isLazer ? "/Max Combo" : ""}`}, 
                     HTML("span", {class: `combo ${isMCombo ? "legacy-perfect-combo" : ""}`}, HTML(`${data.max_combo}`)),
                     isLazer ? HTML("/") : null,
                     isLazer ? HTML("span", {class: "max-combo"}, HTML(MCombo)) : null,
@@ -1056,16 +1052,9 @@ const ListItemWorker = (ele, data, isLazer) => {
                     HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.miss))
                 )
             );
-            scrMsg += `${data.statistics.perfect}-${data.statistics.great}-${data.statistics.good}-${data.statistics.ok}-${data.statistics.meh}-${data.statistics.miss} ${data.max_combo}`;
-            if(isLazer){
-                scrMsg += `/${MCombo}`;
-            }
-            scrMsg += "x\n";
-            scrMsg += `🍚 ${cnt[0]} 🍜 ${cnt[1]}\n`;
             break;
         }
     }
-    scr[data.id] = scrMsg;
 }
 let lastInitData;
 const OsuLevelToExp = (n) => {
@@ -1151,14 +1140,6 @@ const ImproveBeatmapPlaycountItems = () => {
 const CloseScoreCardPopup = () => {
     document.querySelector("div.score-card-popup-window").remove();
 }
-const CopyToClipboard = (txt) => {
-	const t = document.createElement('textarea');
-	t.value = txt;
-	document.body.appendChild(t);
-	t.select();
-	document.execCommand('copy');
-	document.body.removeChild(t);
-}
 const ShowScoreCardPopup = () => {
     const p = document.querySelector("div.js-portal");
     if(!p) return;
@@ -1173,17 +1154,10 @@ const ShowScoreCardPopup = () => {
         )
     );
 };
-const CopyDetailsPopup = (id) => {
-    let msg = scr[document.querySelector("div.js-portal")?.querySelector("div.simple-menu").querySelector("a").href.split("/").pop()];
-    console.log(msg);
-    CopyToClipboard(msg);
-    ShowPopup("Score details copied to clipboard!");
-};
 const AddPopupButton = () => {
     const p = document.querySelector("div.js-portal")?.querySelector("div.simple-menu");
     if(!p || p.querySelector("button.score-card-popup-button")) return;
-    // p.append(HTML("button", {class: "score-card-popup-button simple-menu__item", type: "button", eventListener: [{type: "click", listener: ShowScoreCardPopup}]}, HTML("Popup")));
-    p.append(HTML("button", {class: "score-card-popup-button simple-menu__item", type: "button", eventListener: [{type: "click", listener: CopyDetailsPopup}]}, HTML("Copy Text Details")));
+    p.append(HTML("button", {class: "score-card-popup-button simple-menu__item", type: "button", eventListener: [{type: "click", listener: ShowScoreCardPopup}]}, HTML("Popup")));
 };
 const OnMutation = (mulist) => {
     mut.disconnect();
@@ -1191,7 +1165,7 @@ const OnMutation = (mulist) => {
     FilterBeatmapSet();
     ImproveBeatmapPlaycountItems();
     ImproveProfile(mulist);
-    AddPopupButton();
+    //AddPopupButton();
     mut.observe(document, {childList: true, subtree: true});
 };
 const MessageFilter = (message) => {
@@ -1239,3 +1213,25 @@ mut.observe(document, {childList: true, subtree: true});
 InsertStyleSheet();
 //{id, mode} -> (bmid -> record)
 console.log("osu!web enhancement loaded");
+
+
+// below are test code
+/*
+const osusrc = "https://i.ppy.sh/bde5906f8f985126f4ea624d3eb14c8702883aa2/68747470733a2f2f6f73752e7070792e73682f77696b692f696d616765732f536b696e6e696e672f496e746572666163652f696d672f6d6f64652d6f73752e706e67";
+const taikosrc = "https://i.ppy.sh/c1a9502ea05c9fcde03a375ebf528a12ff30cae7/68747470733a2f2f6f73752e7070792e73682f77696b692f696d616765732f536b696e6e696e672f496e746572666163652f696d672f6d6f64652d7461696b6f2e706e67";
+const fruitsrc = "https://i.ppy.sh/e7cad0470810a868df06d597e3441812659c0bfa/68747470733a2f2f6f73752e7070792e73682f77696b692f696d616765732f536b696e6e696e672f496e746572666163652f696d672f6d6f64652d6672756974732e706e67";
+const maniasrc = "https://i.ppy.sh/55d9494fcf7c3ef2d614695a9a951977a21f23f6/68747470733a2f2f6f73752e7070792e73682f77696b692f696d616765732f536b696e6e696e672f496e746572666163652f696d672f6d6f64652d6d616e69612e706e67";
+const pngsrc = [osusrc, taikosrc, fruitsrc, maniasrc];
+const png = [null, null, null, null];
+let canvas, ctx, cw, ch;
+const ToggleSnow = async (modeid) => {
+    if(canvas) {canvas.remove(); return;}
+    canvas = HTML("canvas", {style: `position: fixed; bottom: 0px; left: 0px;`, width: window.innerWidth, height: window.innerHeight});
+    document.body.append(canvas);
+    ctx = canvas.getContext("webgl2");
+    if(!png[modeid]){
+        const response = await fetch(pngsrc[modeid]);
+        png[modeid] = await response.blob();
+    }
+}
+*/
