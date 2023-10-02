@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.6.3.1
+// @version 0.6.4
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -801,7 +801,10 @@ const PPGiniIndex = () => {
     .sort((a, b) => b - a);
     if(vals.length === 0) ShowPopup("Could not find best play data", "danger");
     const min = vals[vals.length - 1];
-    vals = vals.map(val => val - min);
+    let _ = 0; for(let i = vals.length - 1; i >= 0; i--) {
+        _ += vals[i] - min;
+        vals[i] = _;
+    }
     const SB = vals.reduce((sum, val) => sum + val, -(vals[0] / 2));
     const SAB = vals[0] / 2 * vals.length;
     ShowPopup(`Your pp Gini index of bp${vals.length} is ${(1 - SB/SAB).toPrecision(6)}.`);
