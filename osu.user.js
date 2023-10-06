@@ -46,13 +46,10 @@ const inj_style =
 .osu-db-button:hover{
     cursor: pointer;
 }
-.beatmapsets__item.owned-beatmapset{
-    opacity: 1.0;
-}
-.beatmapsets__item.owned-beatmapset .beatmapset-panel__menu-container{
+.beatmapset-panel[owned-beatmapset] .beatmapset-panel__menu-container{
     background-color: #87dda8;
 }
-.beatmapsets__item.owned-beatmapset .fas, .beatmapsets__item.owned-beatmapset .far{
+.beatmapset-panel[owned-beatmapset] .beatmapset-panel__menu .fa-file-download, .beatmapset-panel[owned-beatmapset] .beatmapset-panel__menu .fa-heart{
     color: #5c9170;
 }
 .owned-beatmap-link{
@@ -299,6 +296,7 @@ const locales = {
             "Copy Text Details": "复制文本信息",
             "Could not find best play data": "无法获取 BP 数据",
             "The latest version is already installed!": "已安装最新版本！",
+            "Script is already busy reading a osu!.db file.": "脚本已经开始读取 osu!.db 文件。",
             "There are still remaining unread bytes, something may be wrong.": "部分数据未能读取，可能发生错误。",
             "Score details copied to clipboard!": "分数信息已复制到剪贴板！",
             "%{pc} of total pp": "占总 pp 的 %{pc}",
@@ -323,6 +321,7 @@ const locales = {
             "Copy Text Details": "複製文字訊息",
             "Could not find best play data": "无法獲取 BP 數據",
             "The latest version is already installed!": "已安裝最新版本！",
+            "Script is already busy reading a osu!.db file.": "腳本已經開始讀取 osu!.db 文件。",
             "There are still remaining unread bytes, something may be wrong.": "部分數據未能讀取，可能發生錯誤。",
             "Score details copied to clipboard!": "分數訊息已複製到剪貼簿！",
             "%{pc} of total pp": "佔總 pp 的 %{pc}",
@@ -347,6 +346,7 @@ const locales = {
             "Copy Text Details": "詳細をテキストにコピー",
             "Could not find best play data": "BP データが見つからない",
             "The latest version is already installed!": "最新版は既にインストールされている！",
+            "Script is already busy reading a osu!.db file.": "スクリプトは osu!.db ファイルの読み取りを既に始める。",
             "There are still remaining unread bytes, something may be wrong.": "一部のデータを読み取れません、多分何かの間違いだ。",
             "Score details copied to clipboard!": "スコア詳細をクリップボードにコピー！",
             "%{pc} of total pp": "全 pp の %{pc}",
@@ -416,195 +416,207 @@ const OsuMod = {
     ScoreV2:        1 << 29,
     Mirror:         1 << 30,
 };
-class Byte{ value = 0; constructor(arr, iter){ this.value = arr[iter.nxtpos++]; } };
-class RankedStatus extends Byte{
-    constructor(arr, iter){
-        super(arr, iter);
-        switch(this.value){
-            case 1: this.description = "unsubmitted"; break;
-            case 2: this.description = "pending/wip/graveyard"; break;
-            case 3: this.description = "unused"; break;
-            case 4: this.description = "ranked"; break;
-            case 5: this.description = "approved"; break;
-            case 6: this.description = "qualified"; break;
-            case 7: this.description = "loved"; break;
-            default: this.description = "unknown"; this.value = 0;
+const Byte = (arr, iter) => {
+    return arr[iter.nxtpos++];
+}
+const RankedStatus = (arr, iter) => {
+    let r = {value: Byte(arr, iter), description: ""};
+    switch(r.value){
+        case 1: r.description = "unsubmitted"; break;
+        case 2: r.description = "pending/wip/graveyard"; break;
+        case 3: r.description = "unused"; break;
+        case 4: r.description = "ranked"; break;
+        case 5: r.description = "approved"; break;
+        case 6: r.description = "qualified"; break;
+        case 7: r.description = "loved"; break;
+        default: r.description = "unknown"; r.value = 0;
+    }
+};
+const OsuMode = (arr, iter) => {
+    let r = {value: Byte(arr, iter), description: ""};
+    switch(r.value){
+        case 1: r.description = "taiko"; break;
+        case 2: r.description = "catch"; break;
+        case 3: r.description = "mania"; break;
+        default: r.value = 0; r.description = "osu";
+    }
+};
+const Grade = (arr, iter) => {
+    let r = {value: Byte(arr, iter), description: ""};
+    switch(r.value){
+        case 0: r.description = "SSH"; break;
+        case 1: r.description = "SH"; break;
+        case 2: r.description = "SS"; break;
+        case 3: r.description = "S"; break;
+        case 4: r.description = "A"; break;
+        case 5: r.description = "B"; break;
+        case 6: r.description = "C"; break;
+        case 7: r.description = "D"; break;
+        default: r.description = "not played";
+    }
+};
+const Short = (arr, iter) => (arr[iter.nxtpos++] | arr[iter.nxtpos++] << 8);
+const Int = (arr, iter) => { return arr[iter.nxtpos++] | arr[iter.nxtpos++] << 8 | arr[iter.nxtpos++] << 16 | arr[iter.nxtpos++] << 24; };
+const Long = (arr, iter) => { const r = new DataView(arr.buffer, iter.nxtpos, 8).getBigUint64(0, true); iter.nxtpos += 8; return r; };
+const ULEB128 = (arr, iter) => {
+    let value = 0n, shift = 0n;
+    while(true){
+        let peek = BigInt(arr[iter.nxtpos++]);
+        value |= (peek & 0x7Fn) << shift;
+        if((peek & 0x80n) === 0n) break;
+        shift += 7n;
+    }
+    return value;
+};
+const Single = (arr, iter) => { const r = new DataView(arr.buffer, iter.nxtpos, 4).getFloat32(0, true); iter.nxtpos += 4; return r; };
+const Double = (arr, iter) => { const r = new DataView(arr.buffer, iter.nxtpos, 8).getFloat64(0, true); iter.nxtpos += 8; return r; };
+const Boolean = (arr, iter) => { return arr[iter.nxtpos++] !== 0x00; };
+const OString = (arr, iter) => {
+    let value = "";
+    switch(arr[iter.nxtpos++]){
+        case 0: break;
+        case 0x0b: {
+            const l = ULEB128(arr, iter);
+            const bv = new Uint8Array(arr.buffer, iter.nxtpos, Number(l));
+            value = new TextDecoder().decode(bv);
+            iter.nxtpos += Number(l);
+            break;
+        }
+        default: console.assert(false, `error occurred while parsing osu string with the first byte.`);
+    }
+    return value;
+};
+const IntDouble = (arr, iter) => {
+    let r = {int: 0, double: 0};
+    const m1 = arr[iter.nxtpos++];
+    console.assert(m1 === 0x08, `error occurred while parsing Int-Double pair at ${iter.nxtpos - 1} with value 0x${m1.toString(16)}: should be 0x8.`);
+    r.int = Int(arr, iter);
+    const m2 = arr[iter.nxtpos++];
+    console.assert(m2 === 0x0d, `error occurred while parsing Int-Double pair at ${iter.nxtpos - 1} with value 0x${m1.toString(16)}: should be 0x8.`);
+    r.double = Double(arr, iter);
+    return r;
+};
+const IntDoubleArray = (arr, iter) => {
+    let r = new Array(Int(arr, iter));
+    for(let i = 0; i < r.length; i++) r[i] = IntDouble(arr, iter);
+    return r;
+};
+const TimingPoint = (arr, iter) => {
+    return {
+        BPM: Double(arr, iter),
+        offset: Double(arr, iter),
+        notInherited: Boolean(arr, iter),
+    };
+};
+const TimingPointArray = (arr, iter) => {
+    let r = new Array(Int(arr, iter));
+    for(let i = 0; i < r.length; i++) r[i] = TimingPoint(arr, iter);
+    return r;
+};
+const DateTime = Long;
+const Beatmap = (arr, iter) => {
+    return {
+        bytes: (iter.osuVersion < 20191106) ? Int(arr, iter) : undefined,
+        artistName: OString(arr, iter),
+        artistNameUnicode: OString(arr, iter),
+        songTitle: OString(arr, iter),
+        songTitleUnicode: OString(arr, iter),
+        creatorName: OString(arr, iter),
+        difficultyName: OString(arr, iter),
+        audioFilename: OString(arr, iter),
+        MD5Hash: OString(arr, iter),
+        beatmapFilename: OString(arr, iter),
+        rankedStatus: RankedStatus(arr, iter),
+        hitcircleCount: Short(arr, iter),
+        sliderCount: Short(arr, iter),
+        spinnerCount: Short(arr, iter),
+        lastModified: Long(arr, iter),
+        AR: iter.osuVersion < 20140609 ? Byte(arr, iter) : Single(arr, iter),
+        CS: iter.osuVersion < 20140609 ? Byte(arr, iter) : Single(arr, iter),
+        HP: iter.osuVersion < 20140609 ? Byte(arr, iter) : Single(arr, iter),
+        OD: iter.osuVersion < 20140609 ? Byte(arr, iter) : Single(arr, iter),
+        sliderVelocity: Double(arr, iter),
+        osuSRInfoArr: (iter.osuVersion >= 20140609) ? IntDoubleArray(arr, iter) : undefined,
+        taikoSRInfoArr: (iter.osuVersion >= 20140609) ? IntDoubleArray(arr, iter) : undefined,
+        catchSRInfoArr: (iter.osuVersion >= 20140609) ? IntDoubleArray(arr, iter) : undefined,
+        maniaSRInfoArr: (iter.osuVersion >= 20140609) ? IntDoubleArray(arr, iter) : undefined,
+        drainTime: Int(arr, iter),
+        totalTime: Int(arr, iter),
+        audioPreviewTime: Int(arr, iter),
+        timingPointArr: TimingPointArray(arr, iter),
+        difficultyID: Int(arr, iter),
+        beatmapID: Int(arr, iter),
+        threadID: Int(arr, iter),
+        osuGrade: Grade(arr, iter),
+        taikoGrade: Grade(arr, iter),
+        catchGrade: Grade(arr, iter),
+        maniaGrade: Grade(arr, iter),
+        offsetLocal: Short(arr, iter),
+        stackLeniency: Single(arr, iter),
+        mode: OsuMode(arr, iter),
+        sourceStr: OString(arr, iter),
+        tagStr: OString(arr, iter),
+        offsetOnline: Short(arr, iter),
+        titleFont: OString(arr, iter),
+        unplayed: Boolean(arr, iter),
+        lastTimePlayed: Long(arr, iter),
+        isOsz2: Boolean(arr, iter),
+        folderName: OString(arr, iter),
+        lastTimeChecked: Long(arr, iter),
+        ignoreBeatmapSound: Boolean(arr, iter),
+        ignoreBeatmapSkin: Boolean(arr, iter),
+        disableStoryboard: Boolean(arr, iter),
+        disableVideo: Boolean(arr, iter),
+        visualOverride: Boolean(arr, iter),
+        uselessShort: (iter.osuVersion < 20140609) ? Short(arr, iter) : undefined,
+        lastModified: Int(arr, iter),
+        scrollSpeedMania: Byte(arr, iter),
+    };
+};
+class _ProgressBar{
+    barEle = null;
+    Show(){
+        if(this.barEle) { this.barEle.style.setProperty("opacity", "1"); return; }
+        this.barEle = HTML("div", {class: "owenhancement-progress-bar", style: "position: fixed; left: 0px; top: 0px; width: 0%; height: 3px; background-color: #fc2; opacity: 1; z-index: 999;"});
+        document.body.insertAdjacentElement("beforebegin", this.barEle); 
+    }
+    Progress(prog){
+        if(this.barEle) this.barEle.style.setProperty("width", `${prog * 100}%`);
+        if(prog >= 1) this.Hide();
+    }
+    Hide(){ this.barEle.style.setProperty("opacity", "0"); }
+};
+const ProgressBar = new _ProgressBar();
+const BeatmapArray = async (arr, iter) => {
+    let r = new Array(Int(arr, iter));
+    for(let i = 0; i < r.length; i++){
+        r[i] = Beatmap(arr, iter);
+        if((i + 1) % 1000 === 0){
+            ProgressBar.Progress((i + 1) / (r.length));
+            await new Promise((res, rej) => setTimeout(() => res(), 0));
         }
     }
+    return r;
 };
-class OsuMode extends Byte{
+const OsuDb = async (arr, iter) => {
+    ProgressBar.Show();
+    let r = {};
+    r.version = Int(arr, iter);
+    iter.osuVersion = r.version;
+    r.folderCount = Int(arr, iter);
+    r.accountUnlocked = Boolean(arr, iter);
+    r.timeTillUnlock = DateTime(arr, iter);
+    r.playerName = OString(arr, iter);
+    r.beatmapArray = await BeatmapArray(arr, iter);
+    r.permission = Int(arr, iter);
+    ProgressBar.Hide();
+    return r;
+};
+class ScoreDb{
     constructor(arr, iter){
-        super(arr, iter);
-        switch(this.value){
-            case 1: this.description = "taiko"; break;
-            case 2: this.description = "catch"; break;
-            case 3: this.description = "mania"; break;
-            default: this.value = 0; this.description = "osu";
-        }
+
     }
-};
-class Grade extends Byte{
-    constructor(arr, iter){
-        super(arr, iter);
-        switch(this.value){
-            case 0: this.description = "SSH"; break;
-            case 1: this.description = "SH"; break;
-            case 2: this.description = "SS"; break;
-            case 3: this.description = "S"; break;
-            case 4: this.description = "A"; break;
-            case 5: this.description = "B"; break;
-            case 6: this.description = "C"; break;
-            case 7: this.description = "D"; break;
-            default: this.description = "not played";
-        }
-    }
-};
-class Short{ value = 0; constructor(arr, iter){ this.value = arr[iter.nxtpos++] | arr[iter.nxtpos++] << 8; } };
-class Int{ value = 0; constructor(arr, iter){ this.value = arr[iter.nxtpos++] | arr[iter.nxtpos++] << 8 | arr[iter.nxtpos++] << 16 | arr[iter.nxtpos++] << 24; } };
-class Long{ value = 0n; constructor(arr, iter){ this.value = new DataView(arr.buffer, iter.nxtpos, 8).getBigUint64(0, true); iter.nxtpos += 8; } };
-class ULEB128{
-    value = 0n;
-    constructor(arr, iter){
-        let shift = 0n;
-        while(true){
-            let peek = BigInt(arr[iter.nxtpos++]);
-            this.value |= (peek & 0x7Fn) << shift;
-            if((peek & 0x80n) === 0n) break;
-            shift += 7n;
-        }
-    }
-};
-class Single{ value = 0; constructor(arr, iter){ this.value = new DataView(arr.buffer, iter.nxtpos, 4).getFloat32(0, true); iter.nxtpos += 4; } };
-class Double{ value = 0; constructor(arr, iter){ this.value = new DataView(arr.buffer, iter.nxtpos, 8).getFloat64(0, true); iter.nxtpos += 8; } };
-class Boolean{ value = false; constructor(arr, iter){ this.value = arr[iter.nxtpos++] !== 0x00; } };
-class OString{
-    value = "";
-    constructor(arr, iter){
-        switch(arr[iter.nxtpos++]){
-            case 0: break;
-            case 0x0b: {
-                const l = new ULEB128(arr, iter).value;
-                const bv = new Uint8Array(arr.buffer, iter.nxtpos, Number(l));
-                this.value = new TextDecoder().decode(bv);
-                iter.nxtpos += Number(l);
-                break;
-            }
-            default: console.assert(false, `error occurred while parsing osu string with the first byte.`);
-        }
-    }
-};
-class IntDouble{
-    int = 0;
-    double = 0;
-    constructor(arr, iter){
-        const m1 = arr[iter.nxtpos++];
-        console.assert(m1 === 0x08, `error occurred while parsing Int-Double pair at ${iter.nxtpos - 1} with value 0x${m1.toString(16)}: should be 0x8.`);
-        this.int = new Int(arr, iter).value;
-        const m2 = arr[iter.nxtpos++];
-        console.assert(m2 === 0x0d, `error occurred while parsing Int-Double pair at ${iter.nxtpos - 1} with value 0x${m1.toString(16)}: should be 0x8.`);
-        this.double = new Double(arr, iter).value;
-    }
-};
-class IntDoubleArray extends Array{
-    constructor(arr, iter){
-        super(new Int(arr, iter).value);
-        for(let i = 0; i < this.length; i++) this[i] = new IntDouble(arr, iter);
-    }
-};
-class TimingPoint{
-    BPM = 0;
-    offset = 0;
-    notInherited = false;
-    constructor(arr, iter){
-        this.BPM = new Double(arr, iter).value;
-        this.offset = new Double(arr, iter).value;
-        this.notInherited = new Boolean(arr, iter).value;
-    }
-};
-class TimingPointArray extends Array{
-    constructor(arr, iter){
-        super(new Int(arr, iter).value);
-        for(let i = 0; i < this.length; i++) this[i] = new TimingPoint(arr, iter);
-    }
-};
-class DateTime extends Long{};
-class Beatmap{
-    constructor(arr, iter){
-        if(iter.osuVersion < 20191106) this.bytes = new Int(arr, iter);
-        this.artistName = new OString(arr, iter);
-        this.artistNameUnicode = new OString(arr, iter);
-        this.songTitle = new OString(arr, iter);
-        this.songTitleUnicode = new OString(arr, iter);
-        this.creatorName = new OString(arr, iter);
-        this.difficultyName = new OString(arr, iter);
-        this.audioFilename = new OString(arr, iter);
-        this.MD5Hash = new OString(arr, iter);
-        this.beatmapFilename = new OString(arr, iter);
-        this.rankedStatus = new RankedStatus(arr, iter);
-        this.hitcircleCount = new Short(arr, iter);
-        this.sliderCount = new Short(arr, iter);
-        this.spinnerCount = new Short(arr, iter);
-        this.lastModified = new Long(arr, iter);
-        this.AR = iter.osuVersion < 20140609 ? new Byte(arr, iter) : new Single(arr, iter);
-        this.CS = iter.osuVersion < 20140609 ? new Byte(arr, iter) : new Single(arr, iter);
-        this.HP = iter.osuVersion < 20140609 ? new Byte(arr, iter) : new Single(arr, iter);
-        this.OD = iter.osuVersion < 20140609 ? new Byte(arr, iter) : new Single(arr, iter);
-        this.sliderVelocity = new Double(arr, iter);
-        if(iter.osuVersion >= 20140609) this.osuSRInfoArr = new IntDoubleArray(arr, iter);
-        if(iter.osuVersion >= 20140609) this.taikoSRInfoArr = new IntDoubleArray(arr, iter);
-        if(iter.osuVersion >= 20140609) this.catchSRInfoArr = new IntDoubleArray(arr, iter);
-        if(iter.osuVersion >= 20140609) this.maniaSRInfoArr = new IntDoubleArray(arr, iter);
-        this.drainTime = new Int(arr, iter);
-        this.totalTime = new Int(arr, iter);
-        this.audioPreviewTime = new Int(arr, iter);
-        this.timingPointArr = new TimingPointArray(arr, iter);
-        this.difficultyID = new Int(arr, iter);
-        this.beatmapID = new Int(arr, iter);
-        this.threadID = new Int(arr, iter);
-        this.osuGrade = new Grade(arr, iter);
-        this.taikoGrade = new Grade(arr, iter);
-        this.catchGrade = new Grade(arr, iter);
-        this.maniaGrade = new Grade(arr, iter);
-        this.offsetLocal = new Short(arr, iter);
-        this.stackLeniency = new Single(arr, iter);
-        this.mode = new OsuMode(arr, iter);
-        this.sourceStr = new OString(arr, iter);
-        this.tagStr = new OString(arr, iter);
-        this.offsetOnline = new Short(arr, iter);
-        this.titleFont = new OString(arr, iter);
-        this.unplayed = new Boolean(arr, iter);
-        this.lastTimePlayed = new Long(arr, iter);
-        this.isOsz2 = new Boolean(arr, iter);
-        this.folderName = new OString(arr, iter);
-        this.lastTimeChecked = new Long(arr, iter);
-        this.ignoreBeatmapSound = new Boolean(arr, iter);
-        this.ignoreBeatmapSkin = new Boolean(arr, iter);
-        this.disableStoryboard = new Boolean(arr, iter);
-        this.disableVideo = new Boolean(arr, iter);
-        this.visualOverride = new Boolean(arr, iter);
-        if(iter.osuVersion < 20140609) this.uselessShort = new Short(arr, iter);
-        this.lastModified = new Int(arr, iter);
-        this.scrollSpeedMania = new Byte(arr, iter);
-    }
-};
-class BeatmapArray extends Array{
-    constructor(arr, iter){
-        super(new Int(arr, iter).value);
-        for(let i = 0; i < this.length; i++) this[i] = new Beatmap(arr, iter);
-    }
-};
-class OsuDb{
-    constructor(arr, iter){
-        this.version = new Int(arr, iter);
-        iter.osuVersion = this.version.value;
-        this.folderCount = new Int(arr, iter);
-        this.accountUnlocked = new Boolean(arr, iter);
-        this.timeTillUnlock = new DateTime(arr, iter);
-        this.playerName = new OString(arr, iter);
-        this.beatmapArray = new BeatmapArray(arr, iter);
-        this.permission = new Int(arr, iter);
-    }
-};
+}
 const beatmapsets = new Set();
 const beatmaps = new Set();
 const bmsReg = /https:\/\/(?:osu|lazer)\.ppy\.sh\/beatmapsets\/([0-9]+)/;
@@ -612,32 +624,36 @@ const bmsdlReg = /https:\/\/(?:osu|lazer)\.ppy\.sh\/beatmapsets\/([0-9]+)\/downl
 const bmReg = /https:\/\/(?:osu|lazer)\.ppy\.sh\/beatmapsets\/(?:[0-9]+)#(?:mania|osu|fruits|taiko)\/([0-9]+)/;
 const BeatmapsetRefresh = () => {
     for(const bm of window.osudb.beatmapArray){
-        beatmaps.add(bm.difficultyID.value);
-        beatmapsets.add(bm.beatmapID.value);
+        beatmaps.add(bm.difficultyID);
+        beatmapsets.add(bm.beatmapID);
     }
     OnMutation();
 };
-const NewOsuDb = (r) => {
-    return new Promise((resolve, reject) => {
-        const start = performance.now();
-        const result = new Uint8Array(r.result);
-        const length = result.length;
-        console.log(`start reading osu!.db(${length} Bytes).`);
-        const iter = {
-            nxtpos: 0,
-        };
-        window.osudb = new OsuDb(result, iter);
-        if(iter.nxtpos !== length) ShowPopup(i18n("There are still remaining unread bytes, something may be wrong."), "danger");
-        ShowPopup(i18n("Finished reading osu!.db in %{time} ms.", {time: performance.now() - start}));
-        resolve();
-    })
+const NewOsuDb = async (r) => {
+    const start = performance.now();
+    const result = new Uint8Array(r.result);
+    const length = result.length;
+    console.log(`start reading osu!.db(${length} Bytes).`);
+    const iter = {
+        nxtpos: 0,
+    };
+    window.osudb = await OsuDb(result, iter);
+    if(iter.nxtpos !== length) ShowPopup(i18n("There are still remaining unread bytes, something may be wrong."), "danger");
+    ShowPopup(i18n("Finished reading osu!.db in %{time} ms.", {time: performance.now() - start}));
 };
-const ReadOsuDb = (file) => {
+let ReadOsuDbWorking = false;
+const ReadOsuDb = async (file) => {
+    if(ReadOsuDbWorking){
+        ShowPopup("Script is already busy reading a osu!.db file.", "warning");
+        return;
+    }
+    ReadOsuDbWorking = true;
     if(file.name !== "osu!.db"){ console.assert( false, "filename should be 'osu!.db'."); return; }
     const r = new FileReader();
-    r.onload = () => {
-        NewOsuDb(r);
+    r.onload = async () => {
+        await NewOsuDb(r);
         BeatmapsetRefresh();
+        ReadOsuDbWorking = false;
     };
     r.onerror = () => console.assert(false, "error occurred while reading file.");
     r.readAsArrayBuffer(file);
@@ -741,10 +757,10 @@ const AddMenu = () => {
     document.body.appendChild(i);
 };
 const FilterBeatmapSet = () => {
-    document.querySelectorAll(".beatmapsets__item").forEach((item) => {
+    document.querySelectorAll(".beatmapset-panel").forEach((item) => {
         const bmsID = Number(bmsReg.exec(item.innerHTML)?.[1]);
         if(bmsID && beatmapsets.has(bmsID)){
-            item.classList.add("owned-beatmapset");
+            item.setAttribute("owned-beatmapset", "");
         }
     });
     document.querySelectorAll("div.bbcode a, a.osu-md__link").forEach(item => {
@@ -1281,8 +1297,17 @@ const AddPopupButton = () => {
     // p.append(HTML("button", {class: "score-card-popup-button simple-menu__item", type: "button", eventListener: [{type: "click", listener: ShowScoreCardPopup}]}, HTML("Popup")));
     p.append(HTML("button", {class: "score-card-popup-button simple-menu__item", type: "button", eventListener: [{type: "click", listener: CopyDetailsPopup}]}, HTML(i18n("Copy Text Details"))));
 };
+const ReplacePage = () => {
+    if(WindowLocationChanged()){
+        switch(window.location.pathname){
+            case "/new_page":
+                document.body.innerHTML = "<h1>Hello World!</h1>"
+        }
+    }
+}
 const OnMutation = (mulist) => {
     mut.disconnect();
+    ReplacePage();
     AddMenu();
     FilterBeatmapSet();
     ImproveBeatmapPlaycountItems();
