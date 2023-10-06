@@ -644,7 +644,7 @@ const NewOsuDb = async (r) => {
 let ReadOsuDbWorking = false;
 const ReadOsuDb = async (file) => {
     if(ReadOsuDbWorking){
-        ShowPopup("Script is already busy reading a osu!.db file.", "warning");
+        ShowPopup(i18n("Script is already busy reading a osu!.db file."), "warning");
         return;
     }
     ReadOsuDbWorking = true;
