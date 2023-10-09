@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.6.4
+// @version 0.6.5
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -10,6 +10,7 @@
 // @updateURL https://greasyfork.org/scripts/475417-osu-web-enhancement/code/osu!web%20enhancement.user.js
 // @grant none
 // @run-at document-end
+// @require http://i18njs.com/js/i18n.min.js
 // ==/UserScript==
 const ShowPopup = (m, t = "info") => {
     window.popup(m, t);
@@ -34,7 +35,7 @@ const svg_green_tick = URL.createObjectURL(new Blob([
 `<svg viewBox="0 0 18 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
     <polyline points="2,8 7,14 16,2" stroke="#62ee56" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 </svg>`], {type: "image/svg+xml"}));
-const inj_style = 
+const inj_style =
 `#osu-db-input{
     display: none;
 }
@@ -147,7 +148,7 @@ const inj_style =
     height: 14px;
     bottom: 1px;
     position: relative;
-} 
+}
 .play-detail__Accuracy, .play-detail__Accuracy2, .combo, .max-combo, .play-detail__combo{
     display: inline-block;
     width: auto;
@@ -249,7 +250,7 @@ a.beatmap-pack-item-download-link span{
     color: unset;
 }
 `;
-let scriptContent = 
+let scriptContent =
 String.raw`console.log("page script injected from osu!web enhancement");
 if(window.oldXHROpen === undefined){
     window.oldXHROpen = window.XMLHttpRequest.prototype.open;
@@ -277,6 +278,83 @@ if(window.oldXHROpen === undefined){
         return oldXHROpen.apply(this, arguments);
     };
 }`;
+const locales = {
+    "zh": {
+        "values": {
+            "Owned": "已获得",
+            "Download": "下载",
+            "pp Accuracy": "pp-准确度",
+            "V1 Accuracy": "V1-准确度",
+            "V2 Accuracy": "V2-准确度",
+            "Lazer Accuracy": "Lazer-准确度",
+            "Combo": "连击数",
+            "Combo/Max Combo": "连击数/最大连击数",
+            "Import osu!.db": "读取 osu!.db",
+            "Check for update": "检查更新",
+            "Calculate pp Gini index": "计算 pp 基尼指数",
+            "Go to GreasyFork page": "前往 GreasyFork 页面",
+            "Copy Text Details": "复制文本信息",
+            "Could not find best play data": "无法获取 BP 数据",
+            "The latest version is already installed!": "已安装最新版本！",
+            "Script is already busy reading a osu!.db file.": "脚本已经开始读取 osu!.db 文件。",
+            "There are still remaining unread bytes, something may be wrong.": "部分数据未能读取，可能发生错误。",
+            "Score details copied to clipboard!": "分数信息已复制到剪贴板！",
+            "%{pc} of total pp": "占总 pp 的 %{pc}",
+            "Your pp Gini index of bp%{bp} is %{val}.": "BP%{bp} 的 pp 基尼指数为 %{val}。",
+            "Finished reading osu!.db in %{time} ms.": "osu!.db 读取完毕，用时 %{time}ms。"
+        }
+    },
+    "zh-tw": {
+        "values": {
+            "Owned": "已獲得",
+            "Download": "下載",
+            "pp Accuracy": "pp-準確度",
+            "V1 Accuracy": "V1-準確度",
+            "V2 Accuracy": "V2-準確度",
+            "Lazer Accuracy": "Lazer-準確度",
+            "Combo": "連擊數",
+            "Combo/Max Combo": "連擊數/最大連擊數",
+            "Import osu!.db": "讀取 osu!.db",
+            "Check for update": "檢查更新",
+            "Calculate pp Gini index": "計算 pp 基尼指數",
+            "Go to GreasyFork page": "前往 GreasyFork 頁面",
+            "Copy Text Details": "複製文字訊息",
+            "Could not find best play data": "无法獲取 BP 數據",
+            "The latest version is already installed!": "已安裝最新版本！",
+            "Script is already busy reading a osu!.db file.": "腳本已經開始讀取 osu!.db 文件。",
+            "There are still remaining unread bytes, something may be wrong.": "部分數據未能讀取，可能發生錯誤。",
+            "Score details copied to clipboard!": "分數訊息已複製到剪貼簿！",
+            "%{pc} of total pp": "佔總 pp 的 %{pc}",
+            "Your pp Gini index of bp%{bp} is %{val}.": "BP%{bp} 的 pp 基尼指數為 %{val}。",
+            "Finished reading osu!.db in %{time} ms.": "osu!.db 讀取完畢，用時 %{time}ms。"
+        }
+    },
+    "ja": {
+        "values": {
+            "Owned": "取得済み",
+            "Download": "ダウンロード",
+            "pp Accuracy": "pp-精度",
+            "V1 Accuracy": "V1-精度",
+            "V2 Accuracy": "V2-精度",
+            "Lazer Accuracy": "Lazer-精度",
+            "Combo": "コンボ数",
+            "Combo/Max Combo": "コンボ数/最大コンボ数",
+            "Import osu!.db": "osu!.db を読み取る",
+            "Check for update": "更新を確認する",
+            "Calculate pp Gini index": "pp のジニ指数の計算",
+            "Go to GreasyFork page": "GreasyFork のページへ",
+            "Copy Text Details": "詳細をテキストにコピー",
+            "Could not find best play data": "BP データが見つからない",
+            "The latest version is already installed!": "最新版は既にインストールされている！",
+            "Script is already busy reading a osu!.db file.": "スクリプトは osu!.db ファイルの読み取りを既に始める。",
+            "There are still remaining unread bytes, something may be wrong.": "一部のデータを読み取れません、多分何かの間違いだ。",
+            "Score details copied to clipboard!": "スコア詳細をクリップボードにコピー！",
+            "%{pc} of total pp": "全 pp の %{pc}",
+            "Your pp Gini index of bp%{bp} is %{val}.": "BP%{bp} の pp ジニ指数は %{val} です。",
+            "Finished reading osu!.db in %{time} ms.": "osu!.db の読み取りを %{time}ms で完了しました。"
+        }
+    }
+};
 const scriptId = "osu-web-enhancement-XHR-script";
 if(!document.querySelector(`script#${scriptId}`)){
     const script = document.createElement("script");
@@ -500,7 +578,7 @@ class _ProgressBar{
     Show(){
         if(this.barEle) { this.barEle.style.setProperty("opacity", "1"); return; }
         this.barEle = HTML("div", {class: "owenhancement-progress-bar", style: "position: fixed; left: 0px; top: 0px; width: 0%; height: 3px; background-color: #fc2; opacity: 1; z-index: 999;"});
-        document.body.insertAdjacentElement("beforebegin", this.barEle); 
+        document.body.insertAdjacentElement("beforebegin", this.barEle);
     }
     Progress(prog){
         if(this.barEle) this.barEle.style.setProperty("width", `${prog * 100}%`);
@@ -560,13 +638,13 @@ const NewOsuDb = async (r) => {
         nxtpos: 0,
     };
     window.osudb = await OsuDb(result, iter);
-    if(iter.nxtpos !== length) ShowPopup("There are still remaining unread bytes, something may be wrong.", "danger");
-    ShowPopup(`Finished reading osu!.db in ${performance.now() - start} ms.`);
+    if(iter.nxtpos !== length) ShowPopup(i18n("There are still remaining unread bytes, something may be wrong."), "danger");
+    ShowPopup(i18n("Finished reading osu!.db in %{time} ms.", {time: performance.now() - start}));
 };
 let ReadOsuDbWorking = false;
 const ReadOsuDb = async (file) => {
     if(ReadOsuDbWorking){
-        ShowPopup("Script is already busy reading a osu!.db file.", "warning");
+        ShowPopup(i18n("Script is already busy reading a osu!.db file."), "warning");
         return;
     }
     ReadOsuDbWorking = true;
@@ -609,7 +687,7 @@ const CheckForUpdate = () => {
                 a.click();
             }
             else{
-                ShowPopup("The lastest version is already installed!")
+                ShowPopup(i18n("The latest version is already installed!"))
             }
         }
     });
@@ -639,7 +717,7 @@ const AddMenu = () => {
     const menuTgtId = "osu-web-enhancement";
     anc.insertAdjacentElement("beforebegin",
         HTML("div", {class: "nav2__col nav2__col--menu", id: menuId},
-            HTML("div", {class: "nav2__menu-link-main js-menu", "data-menu-target": `nav2-menu-popup-${menuTgtId}`, "data-menu-show-delay":"0", style:"flex-direction: column; cursor: default;"}, 
+            HTML("div", {class: "nav2__menu-link-main js-menu", "data-menu-target": `nav2-menu-popup-${menuTgtId}`, "data-menu-show-delay":"0", style:"flex-direction: column; cursor: default;"},
                 HTML("span", {style: "flex-grow: 1;"}),
                 HTML("span", {style: "font-size: 10px;"}, HTML("osu!web")),
                 HTML("span", {style: "font-size: 10px;"}, HTML("enhancement")),
@@ -647,10 +725,10 @@ const AddMenu = () => {
             ),
             HTML("div", {class: "nav2__menu-popup"},
                 HTML("div", {class: `${menuClass}`, "data-menu-id": `nav2-menu-popup-${menuTgtId}`, "data-visibility": "hidden"},
-                    HTML("div", {class: `${menuItemClass}`, style: "cursor: pointer;", "data-function-id": "import-osu-db-button", }, HTML("Import osu!.db")),
-                    HTML("div", {class: `${menuItemClass}`, style: "cursor: pointer;", "data-function-id": "check-for-update-button"}, HTML("Check for update")),
-                    HTML("div", {class: `${menuItemClass}`, style: "cursor: pointer;", "data-function-id": "pp-gini-index-calculator"}, HTML("Calculate pp Gini index")),
-                    HTML("a", {class: `${menuItemClass}`, style: "cursor: pointer;", href: "https://greasyfork.org/en/scripts/475417-osu-web-enhancement", target: "_blank"}, HTML("Go to GreasyFork page"))
+                    HTML("div", {class: `${menuItemClass}`, style: "cursor: pointer;", "data-function-id": "import-osu-db-button", }, HTML(i18n("Import osu!.db"))),
+                    HTML("div", {class: `${menuItemClass}`, style: "cursor: pointer;", "data-function-id": "check-for-update-button"}, HTML(i18n("Check for update"))),
+                    HTML("div", {class: `${menuItemClass}`, style: "cursor: pointer;", "data-function-id": "pp-gini-index-calculator"}, HTML(i18n("Calculate pp Gini index"))),
+                    HTML("a", {class: `${menuItemClass}`, style: "cursor: pointer;", href: "https://greasyfork.org/en/scripts/475417-osu-web-enhancement", target: "_blank"}, HTML(i18n("Go to GreasyFork page")))
                 ),
             )
         )
@@ -669,10 +747,10 @@ const AddMenu = () => {
                 HTML("osu!web enhancement"),
             ),
             HTML("ul", {class: "navbar-mobile-item__submenu js-click-menu", "data-click-menu-id": `nav-mobile-${menuTgtId}`, "data-visibility": "hidden"},
-                HTML("li", {}, HTML("div", {class: mobMenuItmCls, style: "cursor: pointer;", "data-function-id": "import-osu-db-button",}, HTML("Import osu!.db"))),
-                HTML("li", {}, HTML("div", {class: mobMenuItmCls, style: "cursor: pointer;", "data-function-id": "check-for-update-button"}, HTML("Check for update"))),
-                HTML("li", {}, HTML("div", {class: mobMenuItmCls, style: "cursor: pointer;", "data-function-id": "pp-gini-index-calculator"}, HTML("Calculate pp Gini index"))),
-                HTML("a", {class: `${mobMenuItmCls}`, style: "cursor: pointer;", href: "https://greasyfork.org/en/scripts/475417-osu-web-enhancement", target: "_blank"}, HTML("Go to GreasyFork page"))
+                HTML("li", {}, HTML("div", {class: mobMenuItmCls, style: "cursor: pointer;", "data-function-id": "import-osu-db-button",}, HTML(i18n("Import osu!.db")))),
+                HTML("li", {}, HTML("div", {class: mobMenuItmCls, style: "cursor: pointer;", "data-function-id": "check-for-update-button"}, HTML(i18n("Check for update")))),
+                HTML("li", {}, HTML("div", {class: mobMenuItmCls, style: "cursor: pointer;", "data-function-id": "pp-gini-index-calculator"}, HTML(i18n("Calculate pp Gini index")))),
+                HTML("a", {class: `${mobMenuItmCls}`, style: "cursor: pointer;", href: "https://greasyfork.org/en/scripts/475417-osu-web-enhancement", target: "_blank"}, HTML(i18n("Go to GreasyFork page")))
             )
         )
     );
@@ -694,11 +772,11 @@ const FilterBeatmapSet = () => {
             const box = item.getBoundingClientRect();
             const size = Math.round(box.height / 16 * 14);
             const vert = Math.round(size * 4 / 14) / 2;
-            item.after(HTML("img", {src: svg_green_tick, title: "Owned", alt: "owned beatmap", style: `margin: 0px 5px; width: ${size}px; height: ${size}px; vertical-align: -${vert}px;`}));
+            item.after(HTML("img", {src: svg_green_tick, title: i18n("Owned"), alt: "owned beatmap", style: `margin: 0px 5px; width: ${size}px; height: ${size}px; vertical-align: -${vert}px;`}));
         }else if(e && !item.nextElementSibling?.classList?.contains("beatmap-download-link")){
             item.after(
                 HTML("a", {class: "beatmap-download-link", href: `https://osu.ppy.sh/beatmapsets/${e[1]}/download`, download: ""},
-                    HTML("span", {class: "fas fa-file-download", title: "Download"})
+                    HTML("span", {class: "fas fa-file-download", title: i18n("Download")})
                 )
             );
         }
@@ -710,7 +788,7 @@ const FilterBeatmapSet = () => {
         if(e && beatmapsets.has(Number(e[1]))){
             item.classList.add("owned-beatmap-pack-item");
             const span = item.querySelector("span.fal");
-            span.setAttribute("title", "Owned");
+            span.setAttribute("title", i18n("Owned"));
             span.dataset.origTitle = "owned";
             span.setAttribute("class", "");
             span.append(HTML("img", {src: svg_green_tick, alt: "owned beatmap", style: `width: 16px; height: 16px; vertical-align: -2px;`}));
@@ -722,7 +800,7 @@ const FilterBeatmapSet = () => {
             }
         }else if(e){
             const icon = item.querySelector(".beatmap-pack-items__icon");
-            icon.setAttribute("title", "Download");
+            icon.setAttribute("title", i18n("Download"));
             icon.setAttribute("class", "fas fa-file-download beatmap-pack-items__icon");
             if(icon.parentElement === item){
                 const dl = HTML("a", {class: "beatmap-pack-item-download-link", href: `https://osu.ppy.sh/beatmapsets/${e[1]}/download`, download: ""});
@@ -812,7 +890,10 @@ const PPGiniIndex = () => {
     let vals = [...document.querySelectorAll(`div.js-sortable--page[data-page-id="top_ranks"] div.play-detail-list:nth-child(4) div.play-detail.play-detail--highlightable`)]
     .map((ele) => {const ppele = ele.querySelector("div.play-detail__pp span"); return Number((ppele.title ? ppele.title : ppele.dataset.origTitle).replaceAll(",", ""))})
     .sort((a, b) => b - a);
-    if(vals.length === 0) ShowPopup("Could not find best play data", "danger");
+    if(vals.length === 0) {
+        ShowPopup(i18n("Could not find best play data"), "danger");
+        return;
+    }
     const min = vals[vals.length - 1];
     let _ = 0; for(let i = vals.length - 1; i >= 0; i--) {
         _ += vals[i] - min;
@@ -820,7 +901,7 @@ const PPGiniIndex = () => {
     }
     const SB = vals.reduce((sum, val) => sum + val, -(vals[0] / 2));
     const SAB = vals[0] / 2 * vals.length;
-    ShowPopup(`Your pp Gini index of bp${vals.length} is ${(1 - SB/SAB).toPrecision(6)}.`);
+    ShowPopup(i18n("Your pp Gini index of bp%{bp} is %{val}.", {bp: vals.length, val: (1 - SB/SAB).toPrecision(6)}));
 }
 const TopRanksWorker = (userId, modestr, addedNodes = [document.body]) => {
     const isLazer = window.location.hostname.split(".")[0] === "lazer"; // assume that hostname can only be osu.ppy.sh or lazer.ppy.sh
@@ -849,7 +930,7 @@ const TopRanksWorker = (userId, modestr, addedNodes = [document.body]) => {
     });
     sectionNames.forEach(sectionName => AdjustStyle(modestr, sectionName));
 };
-const DiffToColour = (diff, stops = [0.1, 1.25, 2, 2.5, 3.3, 4.2, 4.9, 5.8, 6.7, 7.7, 9], vals = ['#4290FB', '#4FC0FF', '#4FFFD5', '#7CFF4F', '#F6F05C', '#FF8068', '#FF4E6F', '#C645B8', '#6563DE', '#18158E', '#000000']) => {
+const DiffToColour = (diff, stops = [0, 0.1, 1.25, 2, 2.5, 3.3, 4.2, 4.9, 5.8, 6.7, 7.7, 9], vals = ['#AAAAAA', '#4290FB', '#4FC0FF', '#4FFFD5', '#7CFF4F', '#F6F05C', '#FF8068', '#FF4E6F', '#C645B8', '#6563DE', '#18158E', '#000000']) => {
     const len = stops.length;
     diff = Math.min(Math.max(diff, stops[0]), stops[len - 1]);
     let r = stops.findIndex(stop => stop > diff);
@@ -857,7 +938,7 @@ const DiffToColour = (diff, stops = [0.1, 1.25, 2, 2.5, 3.3, 4.2, 4.9, 5.8, 6.7,
     const d = stops[r] - stops[r - 1];
     return `#${[[1, 3], [3, 5], [5, 7]]
         .map(_ => [Number.parseInt(vals[r].slice(..._), 16), Number.parseInt(vals[r-1].slice(..._), 16)])
-        .map(_ => Math.round((_[0] ** 2.2 * (diff - stops[r-1]) / d + _[1] ** 2.2 * (stops[r] - diff) / d) ** (1 / 2.2)).toString(16).padStart(2, "0")) 
+        .map(_ => Math.round((_[0] ** 2.2 * (diff - stops[r-1]) / d + _[1] ** 2.2 * (stops[r] - diff) / d) ** (1 / 2.2)).toString(16).padStart(2, "0"))
         .join("")
     }`;
 };
@@ -869,7 +950,7 @@ const ListItemWorker = (ele, data, isLazer) => {
         data.pp = Number(data.pp);
         const pptext = ele.querySelector(".play-detail__pp > span").childNodes[0];
         pptext.nodeValue = data.pp >= 1 ? data.pp.toPrecision(5) : (data.pp < 0.00005 ? 0 : data.pp.toFixed(4));
-        if(data.weight) pptext.title = `${data.weight.pp >= 1 ? data.weight.pp.toPrecision(5) : (data.weight.pp < 0.00005 ? 0 : data.weight.pp.toFixed(4))} of total pp`;
+        if(data.weight) pptext.title = i18n("%{pc} of total pp", {pc: data.weight.pp >= 1 ? data.weight.pp.toPrecision(5) : (data.weight.pp < 0.00005 ? 0 : data.weight.pp.toFixed(4))});
     }
     const left = ele.querySelector("div.play-detail__group.play-detail__group--top");
     const leftc = HTML("div", {class: "play-detail__group--background", style: `background-image: url(https://assets.ppy.sh/beatmaps/${data.beatmap.beatmapset_id}/covers/card@2x.jpg);`});
@@ -880,7 +961,7 @@ const ListItemWorker = (ele, data, isLazer) => {
     const db = detail.children[1];
     data.statistics.perfect ??= 0, data.statistics.great ??= 0, data.statistics.good ??= 0, data.statistics.ok ??= 0, data.statistics.meh ??= 0, data.statistics.miss ??= 0;
     const bmName = ele.querySelector("span.play-detail__beatmap");
-    const sr = HTML("div", {class: `difficulty-badge ${data.beatmap.difficulty_rating >= 6.7 ? "difficulty-badge--expert-plus" : ""}`, style: `--bg: ${DiffToColour(data.beatmap.difficulty_rating)}`},
+    const sr = HTML("div", {class: `difficulty-badge ${data.beatmap.difficulty_rating >= 6.5 ? "difficulty-badge--expert-plus" : ""}`, style: `--bg: ${DiffToColour(data.beatmap.difficulty_rating)}`},
         HTML("span", {class: "difficulty-badge__icon"}, HTML("span", {class: "fas fa-star"})),
         HTML("span", {class: "difficulty-badge__rating"}, HTML(`${data.beatmap.difficulty_rating.toFixed(2)}`))
     );
@@ -904,32 +985,32 @@ const ListItemWorker = (ele, data, isLazer) => {
         case 0:{
             du.replaceChildren(
                 HTML("span", {class: "play-detail__before"}),
-                HTML("span", {class: "play-detail__Accuracy", title: `${isLazer ? "V2" : "V1"} Accuracy`}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
-                HTML("span", {class: "play-detail__combo", title: `Combo${isLazer ? "/Max Combo" : ""}`}, 
+                HTML("span", {class: "play-detail__Accuracy", title: i18n(`${isLazer ? "Lazer" : "V1"} Accuracy`)}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
+                HTML("span", {class: "play-detail__combo", title: i18n(`Combo${isLazer ? "/Max Combo" : ""}`)},
                     HTML("span", {class: `combo ${isLazer ?(data.max_combo === (data.maximum_statistics.great ?? 0) + (data.maximum_statistics.legacy_combo_increase ?? 0) ? "legacy-perfect-combo" : ""):(data.legacy_perfect ? "legacy-perfect-combo" : "")}`}, HTML(`${data.max_combo}`)),
                     isLazer ? HTML("/") : null,
                     isLazer ? HTML("span", {class: "max-combo"}, HTML(`${(data.maximum_statistics.great ?? 0) + (data.maximum_statistics.legacy_combo_increase ?? 0)}`)) : null,
                     HTML("x"),
                 ),
             );
-            const m_300 = HTML("span", {class: "score-detail score-detail-osu-300"}, 
-                HTML("span", {class: "osu-300"}, 
+            const m_300 = HTML("span", {class: "score-detail score-detail-osu-300"},
+                HTML("span", {class: "osu-300"},
                     HTML("300")
                 ),
                 HTML("span", {class: "score-detail-data-text"},
                     HTML(`${data.statistics.great + data.statistics.perfect}`)
                 )
             );
-            const s100 = HTML("span", {class: "score-detail score-detail-osu-100"}, 
-                HTML("span", {class: "osu-100"}, 
+            const s100 = HTML("span", {class: "score-detail score-detail-osu-100"},
+                HTML("span", {class: "osu-100"},
                     HTML("100")
                 ),
                 HTML("span", {class: "score-detail-data-text"},
                     HTML(`${data.statistics.ok + data.statistics.good}`)
                 )
             );
-            const s50 = HTML("span", {class: "score-detail score-detail-osu-50"}, 
-                HTML("span", {class: "osu-50"}, 
+            const s50 = HTML("span", {class: "score-detail score-detail-osu-50"},
+                HTML("span", {class: "osu-50"},
                     HTML("50")
                 ),
                 HTML("span", {class: "score-detail-data-text"},
@@ -958,8 +1039,8 @@ const ListItemWorker = (ele, data, isLazer) => {
             const mx = cur[0] + cur[1] + cur[2];
             du.replaceChildren(
                 HTML("span", {class: "play-detail__before"}),
-                HTML("span", {class: "play-detail__Accuracy"}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
-                HTML("span", {class: "play-detail__combo", title: `Combo/Max Combo`},
+                HTML("span", {class: "play-detail__Accuracy", title: i18n(`${isLazer ? "Lazer" : "V1"} Accuracy`)}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
+                HTML("span", {class: "play-detail__combo", title: i18n(`Combo/Max Combo`)},
                     HTML("span", {class: `combo ${(data.max_combo === mx ? "legacy-perfect-combo" : "")}`}, HTML(`${data.max_combo}`)),
                     HTML("/"),
                     HTML("span", {class: "max-combo"}, HTML(`${mx}`)),
@@ -990,11 +1071,11 @@ const ListItemWorker = (ele, data, isLazer) => {
                 const mx = [data.maximum_statistics.great ?? 0, data.maximum_statistics.large_tick_hit ?? 0, data.maximum_statistics.small_tick_hit ?? 0];
                 du.replaceChildren(
                     HTML("span", {class: "play-detail__before"}),
-                    HTML("span", {class: "play-detail__Accuracy"}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
-                    HTML("span", {class: "play-detail__combo", title: `Combo/Max Combo`}, 
+                    HTML("span", {class: "play-detail__Accuracy", title: i18n(`Lazer Accuracy`)}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
+                    HTML("span", {class: "play-detail__combo", title: i18n(`Combo/Max Combo`)},
                         HTML("span", {class: `combo ${(data.max_combo === mx[0] + mx[1] ? "legacy-perfect-combo" : "")}`}, HTML(`${data.max_combo}`)),
-                        isLazer ? HTML("/") : null,
-                        isLazer ? HTML("span", {class: "max-combo"}, HTML(`${mx[0] + mx[1]}`)) : null,
+                        HTML("/"),
+                        HTML("span", {class: "max-combo"}, HTML(`${mx[0] + mx[1]}`)),
                         HTML("x"),
                     ),
                 );
@@ -1017,7 +1098,11 @@ const ListItemWorker = (ele, data, isLazer) => {
             } else {
                 du.replaceChildren(
                     HTML("span", {class: "play-detail__before"}),
-                    HTML("span", {class: "play-detail__Accuracy"}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
+                    HTML("span", {class: "play-detail__Accuracy", title: i18n(`V1 Accuracy`)}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
+                    HTML("span", {class: "play-detail__combo", title: i18n(`Combo`)},
+                        HTML("span", {class: ""}, HTML(`${data.max_combo}`)),
+                        HTML("x")
+                    ),
                 );
                 db.replaceChildren(
                     HTML("span", {class: "score-detail score-detail-fruits-300"},
@@ -1048,9 +1133,9 @@ const ListItemWorker = (ele, data, isLazer) => {
             const isMCombo = isLazer ? data.max_combo >= MCombo : data.legacy_perfect;
             du.replaceChildren(
                 HTML("span", {class: "play-detail__before"}),
-                HTML("span", {class: "play-detail__Accuracy2", title: `pp Accuracy`}, HTML(`${(v2acc * 100).toFixed(2)}%`)),
-                HTML("span", {class: "play-detail__Accuracy", title: `Score${isLazer ? "V2" : "V1"} Accuracy`}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
-                HTML("span", {class: "play-detail__combo", title: `Combo${isLazer ? "/Max Combo" : ""}`}, 
+                HTML("span", {class: "play-detail__Accuracy2", title: i18n(`pp Accuracy`)}, HTML(`${(v2acc * 100).toFixed(2)}%`)),
+                HTML("span", {class: "play-detail__Accuracy", title: i18n(`${isLazer ? "Lazer" : "V1"} Accuracy`)}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
+                HTML("span", {class: "play-detail__combo", title: i18n(`Combo${isLazer ? "/Max Combo" : ""}`)},
                     HTML("span", {class: `combo ${isMCombo ? "legacy-perfect-combo" : ""}`}, HTML(`${data.max_combo}`)),
                     isLazer ? HTML("/") : null,
                     isLazer ? HTML("span", {class: "max-combo"}, HTML(MCombo)) : null,
@@ -1207,13 +1292,13 @@ const CopyDetailsPopup = (id) => {
     let msg = scr[document.querySelector("div.js-portal")?.querySelector("div.simple-menu").querySelector("a").href.split("/").pop()];
     console.log(msg);
     CopyToClipboard(msg);
-    ShowPopup("Score details copied to clipboard!");
+    ShowPopup(i18n("Score details copied to clipboard!"));
 };
 const AddPopupButton = () => {
     const p = document.querySelector("div.js-portal")?.querySelector("div.simple-menu");
     if(!p || p.querySelector("button.score-card-popup-button")) return;
     // p.append(HTML("button", {class: "score-card-popup-button simple-menu__item", type: "button", eventListener: [{type: "click", listener: ShowScoreCardPopup}]}, HTML("Popup")));
-    p.append(HTML("button", {class: "score-card-popup-button simple-menu__item", type: "button", eventListener: [{type: "click", listener: CopyDetailsPopup}]}, HTML("Copy Text Details")));
+    p.append(HTML("button", {class: "score-card-popup-button simple-menu__item", type: "button", eventListener: [{type: "click", listener: CopyDetailsPopup}]}, HTML(i18n("Copy Text Details"))));
 };
 const ReplacePage = () => {
     if(WindowLocationChanged()){
@@ -1272,6 +1357,11 @@ const OnClick = (event) => {
     }
 }
 //document.addEventListener("click", OnClick);
+const curLocale = currentLocale;
+if (locales.hasOwnProperty(curLocale)) {
+    console.log("localization available");
+    i18n.translator.add(locales[curLocale]);
+}
 window.addEventListener("message", WindowMessageFilter);
 const mut = new MutationObserver(OnMutation);
 mut.observe(document, {childList: true, subtree: true});
