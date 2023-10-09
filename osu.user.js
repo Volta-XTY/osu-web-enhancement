@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.6.4
+// @version 0.6.5
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -288,7 +288,7 @@ const locales = {
             "V2 Accuracy": "V2-准确度",
             "Lazer Accuracy": "Lazer-准确度",
             "Combo": "连击数",
-            "Combo / Max Combo": "连击数/最大连击数",
+            "Combo/Max Combo": "连击数/最大连击数",
             "Import osu!.db": "读取 osu!.db",
             "Check for update": "检查更新",
             "Calculate pp Gini index": "计算 pp 基尼指数",
@@ -313,7 +313,7 @@ const locales = {
             "V2 Accuracy": "V2-準確度",
             "Lazer Accuracy": "Lazer-準確度",
             "Combo": "連擊數",
-            "Combo / Max Combo": "連擊數/最大連擊數",
+            "Combo/Max Combo": "連擊數/最大連擊數",
             "Import osu!.db": "讀取 osu!.db",
             "Check for update": "檢查更新",
             "Calculate pp Gini index": "計算 pp 基尼指數",
@@ -338,7 +338,7 @@ const locales = {
             "V2 Accuracy": "V2-精度",
             "Lazer Accuracy": "Lazer-精度",
             "Combo": "コンボ数",
-            "Combo / Max Combo": "コンボ数/最大コンボ数",
+            "Combo/Max Combo": "コンボ数/最大コンボ数",
             "Import osu!.db": "osu!.db を読み取る",
             "Check for update": "更新を確認する",
             "Calculate pp Gini index": "pp のジニ指数の計算",
@@ -578,7 +578,7 @@ class _ProgressBar{
     Show(){
         if(this.barEle) { this.barEle.style.setProperty("opacity", "1"); return; }
         this.barEle = HTML("div", {class: "owenhancement-progress-bar", style: "position: fixed; left: 0px; top: 0px; width: 0%; height: 3px; background-color: #fc2; opacity: 1; z-index: 999;"});
-        document.body.insertAdjacentElement("beforebegin", this.barEle); 
+        document.body.insertAdjacentElement("beforebegin", this.barEle);
     }
     Progress(prog){
         if(this.barEle) this.barEle.style.setProperty("width", `${prog * 100}%`);
@@ -717,7 +717,7 @@ const AddMenu = () => {
     const menuTgtId = "osu-web-enhancement";
     anc.insertAdjacentElement("beforebegin",
         HTML("div", {class: "nav2__col nav2__col--menu", id: menuId},
-            HTML("div", {class: "nav2__menu-link-main js-menu", "data-menu-target": `nav2-menu-popup-${menuTgtId}`, "data-menu-show-delay":"0", style:"flex-direction: column; cursor: default;"}, 
+            HTML("div", {class: "nav2__menu-link-main js-menu", "data-menu-target": `nav2-menu-popup-${menuTgtId}`, "data-menu-show-delay":"0", style:"flex-direction: column; cursor: default;"},
                 HTML("span", {style: "flex-grow: 1;"}),
                 HTML("span", {style: "font-size: 10px;"}, HTML("osu!web")),
                 HTML("span", {style: "font-size: 10px;"}, HTML("enhancement")),
@@ -890,7 +890,10 @@ const PPGiniIndex = () => {
     let vals = [...document.querySelectorAll(`div.js-sortable--page[data-page-id="top_ranks"] div.play-detail-list:nth-child(4) div.play-detail.play-detail--highlightable`)]
     .map((ele) => {const ppele = ele.querySelector("div.play-detail__pp span"); return Number((ppele.title ? ppele.title : ppele.dataset.origTitle).replaceAll(",", ""))})
     .sort((a, b) => b - a);
-    if(vals.length === 0) ShowPopup(i18n("Could not find best play data"), "danger");
+    if(vals.length === 0) {
+        ShowPopup(i18n("Could not find best play data"), "danger");
+        return;
+    }
     const min = vals[vals.length - 1];
     let _ = 0; for(let i = vals.length - 1; i >= 0; i--) {
         _ += vals[i] - min;
@@ -927,7 +930,7 @@ const TopRanksWorker = (userId, modestr, addedNodes = [document.body]) => {
     });
     sectionNames.forEach(sectionName => AdjustStyle(modestr, sectionName));
 };
-const DiffToColour = (diff, stops = [0.1, 1.25, 2, 2.5, 3.3, 4.2, 4.9, 5.8, 6.7, 7.7, 9], vals = ['#4290FB', '#4FC0FF', '#4FFFD5', '#7CFF4F', '#F6F05C', '#FF8068', '#FF4E6F', '#C645B8', '#6563DE', '#18158E', '#000000']) => {
+const DiffToColour = (diff, stops = [0, 0.1, 1.25, 2, 2.5, 3.3, 4.2, 4.9, 5.8, 6.7, 7.7, 9], vals = ['#AAAAAA', '#4290FB', '#4FC0FF', '#4FFFD5', '#7CFF4F', '#F6F05C', '#FF8068', '#FF4E6F', '#C645B8', '#6563DE', '#18158E', '#000000']) => {
     const len = stops.length;
     diff = Math.min(Math.max(diff, stops[0]), stops[len - 1]);
     let r = stops.findIndex(stop => stop > diff);
@@ -958,7 +961,7 @@ const ListItemWorker = (ele, data, isLazer) => {
     const db = detail.children[1];
     data.statistics.perfect ??= 0, data.statistics.great ??= 0, data.statistics.good ??= 0, data.statistics.ok ??= 0, data.statistics.meh ??= 0, data.statistics.miss ??= 0;
     const bmName = ele.querySelector("span.play-detail__beatmap");
-    const sr = HTML("div", {class: `difficulty-badge ${data.beatmap.difficulty_rating >= 6.7 ? "difficulty-badge--expert-plus" : ""}`, style: `--bg: ${DiffToColour(data.beatmap.difficulty_rating)}`},
+    const sr = HTML("div", {class: `difficulty-badge ${data.beatmap.difficulty_rating >= 6.5 ? "difficulty-badge--expert-plus" : ""}`, style: `--bg: ${DiffToColour(data.beatmap.difficulty_rating)}`},
         HTML("span", {class: "difficulty-badge__icon"}, HTML("span", {class: "fas fa-star"})),
         HTML("span", {class: "difficulty-badge__rating"}, HTML(`${data.beatmap.difficulty_rating.toFixed(2)}`))
     );
