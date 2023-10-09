@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.6.7
+// @version 0.6.8
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -852,7 +852,6 @@ const AdjustStyle = (modestr, sectionName) => {
             return w;
         };
     };
-    let cur = past = performance.now();
     let fc = new FasterCalc();
     ll.forEach((str) =>
         s.insertRule(
@@ -861,9 +860,6 @@ const AdjustStyle = (modestr, sectionName) => {
             }` ,0
         )
     );
-    curr = performance.now();
-    console.log(`AdjustStyle Stage 1: ${curr - past}ms`);
-    past = performance.now();
     fc = new FasterCalc();
     [".play-detail__combo", ".play-detail__Accuracy", ".play-detail__Accuracy2"].forEach((str) =>
         s.insertRule(
@@ -873,9 +869,6 @@ const AdjustStyle = (modestr, sectionName) => {
             ,0
         )
     );
-    curr = performance.now();
-    console.log(`AdjustStyle Stage 2: ${curr - past}ms`);
-    past = performance.now();
     [".play-detail__pp"].forEach((str) =>
         s.insertRule(
             `${sectionSelector} ${str}{
@@ -884,9 +877,6 @@ const AdjustStyle = (modestr, sectionName) => {
             ,0
         )
     );
-    curr = performance.now();
-    console.log(`AdjustStyle Stage 3: ${curr - past}ms`);
-    past = performance.now();
 };
 const PPGiniIndex = () => {
     const vals = [...document.querySelectorAll(`div.js-sortable--page[data-page-id="top_ranks"] div.play-detail-list:nth-child(4) div.play-detail.play-detail--highlightable`)]
@@ -1187,11 +1177,11 @@ const messageCache = new Map();
 window.messageCache = messageCache;
 const profUrlReg = /https:\/\/(?:osu|lazer)\.ppy\.sh\/users\/[0-9]+(?:|\/osu|\/taiko|\/fruits|\/mania)/;
 const ImproveProfile = (mulist) => {
-    const initData = null, wloc = window.location.toString();
+    const wloc = window.location.toString();
     if(!profUrlReg.test(wloc)) return;
     const initDataEle = document.querySelector(".js-react--profile-page.osu-layout.osu-layout--full");
     if(!initDataEle) return;
-    initData = JSON.parse(initDataEle.dataset.initialData);
+    const initData = JSON.parse(initDataEle.dataset.initialData);
     const userId = initData.user.id, modestr = initData.current_mode;
     if(initData !== lastInitData){
         let ppDiv = null;
@@ -1292,7 +1282,7 @@ const MakeTextDetail = (data) => {
         case 3: detail =
 `${s.perfect ?? 0}-${s.great ?? 0}-${s.good ?? 0}-${s.ok ?? 0}-${s.meh ?? 0}-${s.miss ?? 0} ${data.max_combo}${isLazer ? `/${(m.perfect ?? 0) + (m.legacy_combo_increase ?? 0)}` : ""}x
 🍚 ${b.count_circles ?? 0} 🍜 ${b.count_sliders ?? 0}
-`; 
+`; break;
         default:;
 }
     const scrMsg = 
