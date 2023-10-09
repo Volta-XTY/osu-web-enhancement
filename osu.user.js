@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.6.5
+// @version 0.6.6
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -431,6 +431,7 @@ const RankedStatus = (arr, iter) => {
         case 7: r.description = "loved"; break;
         default: r.description = "unknown"; r.value = 0;
     }
+    return r;
 };
 const OsuMode = (arr, iter) => {
     let r = {value: Byte(arr, iter), description: ""};
@@ -440,6 +441,7 @@ const OsuMode = (arr, iter) => {
         case 3: r.description = "mania"; break;
         default: r.value = 0; r.description = "osu";
     }
+    return r;
 };
 const Grade = (arr, iter) => {
     let r = {value: Byte(arr, iter), description: ""};
@@ -454,6 +456,7 @@ const Grade = (arr, iter) => {
         case 7: r.description = "D"; break;
         default: r.description = "not played";
     }
+    return r;
 };
 const Short = (arr, iter) => (arr[iter.nxtpos++] | arr[iter.nxtpos++] << 8);
 const Int = (arr, iter) => { return arr[iter.nxtpos++] | arr[iter.nxtpos++] << 8 | arr[iter.nxtpos++] << 16 | arr[iter.nxtpos++] << 24; };
@@ -569,7 +572,7 @@ const Beatmap = (arr, iter) => {
         disableVideo: Boolean(arr, iter),
         visualOverride: Boolean(arr, iter),
         uselessShort: (iter.osuVersion < 20140609) ? Short(arr, iter) : undefined,
-        lastModified: Int(arr, iter),
+        lastModified2: Int(arr, iter),
         scrollSpeedMania: Byte(arr, iter),
     };
 };
@@ -946,6 +949,7 @@ let scr = {};
 const ListItemWorker = (ele, data, isLazer) => {
     if(ele.getAttribute("improved") !== null) return;
     ele.setAttribute("improved", "");
+    ele.setAttribute("data-replay-id", data.id);
     if(data.pp){
         data.pp = Number(data.pp);
         const pptext = ele.querySelector(".play-detail__pp > span").childNodes[0];
@@ -975,11 +979,7 @@ const ListItemWorker = (ele, data, isLazer) => {
     */
     bmName.parentElement.insertBefore(sr, bmName);
     const bma = ele.querySelector("a.play-detail__title");
-    const cnt = [data.beatmap.count_circles, data.beatmap.count_sliders, data.beatmap.count_spinners];
     // const modeName = ["STD", "TAIKO", "CTB", "MANIA"];
-    const secToMin = (s) => `${Math.floor(s/60)}:${String(s%60).padStart(2, '0')}`;
-    // let scrMsg = `${modeName[data.ruleset_id]} ${data.beatmapset.title}\n[${data.beatmap.version}] ${secToMin(data.beatmap.total_length)}\n${data.total_score} ${data.rank} ${data.pp ? (data.pp >= 1 ? data.pp.toPrecision(5) : (data.pp < 0.00005 ? 0 : data.pp.toFixed(4))) : "-"}pp\n`;
-    let scrMsg = `${data.beatmapset.title}\n [${data.beatmap.version}] ${secToMin(data.beatmap.total_length)}\n${data.total_score} ${data.rank} ${data.pp ? (data.pp >= 1 ? data.pp.toPrecision(5) : (data.pp < 0.00005 ? 0 : data.pp.toFixed(4))) : "-"}pp\n`;
     bma.onclick = (e) => {e.stopPropagation();};
     switch(data.ruleset_id){
         case 0:{
@@ -1026,12 +1026,6 @@ const ListItemWorker = (ele, data, isLazer) => {
                 )
             );
             db.replaceChildren(m_300, s100, s50, s0);
-            scrMsg += `${data.statistics.great + data.statistics.perfect}-${data.statistics.ok + data.statistics.good}-${data.statistics.meh}-${data.statistics.miss} ${data.max_combo}`;
-            if (isLazer) {
-                scrMsg += `${(data.maximum_statistics.great ?? 0) + (data.maximum_statistics.legacy_combo_increase ?? 0)}`;
-            }
-            scrMsg += "x\n";
-            scrMsg += `⭕ ${cnt[0]} 🌡️ ${cnt[1]} 🔄 ${cnt[2]}\n`;
             break;
         }
         case 1:{
@@ -1061,8 +1055,6 @@ const ListItemWorker = (ele, data, isLazer) => {
                     HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.miss ?? 0))
                 ),
             );
-            scrMsg += `${data.statistics.great}-${data.statistics.ok}-${data.statistics.miss} ${data.max_combo}/${mx}x\n`;
-            scrMsg += `🥁 ${cnt[0]} 🌡️ ${cnt[1]} 🍥 ${cnt[2]}\n`;
             break;
         }
         case 2:{
@@ -1093,8 +1085,6 @@ const ListItemWorker = (ele, data, isLazer) => {
                         HTML("span", {class: "score-detail-data-text"}, HTML(cur[2] + "/" + mx[2]))
                     )
                 );
-                scrMsg += `${cur[0]}/${mx[0]}-${cur[1]}/${mx[1]}-${cur[2]}/${mx[2]} ${data.max_combo}/${mx[0] + mx[1]}x\n`;
-                scrMsg += `🍎 ${cnt[0]} 💧 ${cnt[1]} 🍌 ${cnt[2]}\n`;
             } else {
                 du.replaceChildren(
                     HTML("span", {class: "play-detail__before"}),
@@ -1122,8 +1112,6 @@ const ListItemWorker = (ele, data, isLazer) => {
                         HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.miss ?? 0))
                     )
                 );
-                scrMsg += `${data.statistics.great ?? 0}-${data.statistics.large_tick_hit ?? 0}-${data.statistics.small_tick_miss ?? 0}-${data.statistics.miss ?? 0} ${data.max_combo}\n`;
-                scrMsg += `🍎 ${cnt[0]} 💧 ${cnt[1]} 🍌 ${cnt[2]}\n`;
             }
             break;
         }
@@ -1171,16 +1159,9 @@ const ListItemWorker = (ele, data, isLazer) => {
                     HTML("span", {class: "score-detail-data-text"}, HTML(data.statistics.miss))
                 )
             );
-            scrMsg += `${data.statistics.perfect}-${data.statistics.great}-${data.statistics.good}-${data.statistics.ok}-${data.statistics.meh}-${data.statistics.miss} ${data.max_combo}`;
-            if(isLazer){
-                scrMsg += `/${MCombo}`;
-            }
-            scrMsg += "x\n";
-            scrMsg += `🍚 ${cnt[0]} 🍜 ${cnt[1]}\n`;
             break;
         }
     }
-    scr[data.id] = scrMsg;
 }
 let lastInitData;
 const OsuLevelToExp = (n) => {
@@ -1208,7 +1189,7 @@ window.messageCache = messageCache;
 const profUrlReg = /https:\/\/(?:osu|lazer)\.ppy\.sh\/users\/[0-9]+(?:|\/osu|\/taiko|\/fruits|\/mania)/;
 const ImproveProfile = (mulist) => {
     let initData, wloc = window.location.toString();
-    if(!profUrlReg.exec(wloc)) return;
+    if(!profUrlReg.test(wloc)) return;
     const initDataEle = document.querySelector(".js-react--profile-page.osu-layout.osu-layout--full");
     if(!initDataEle) return;
     initData = JSON.parse(initDataEle.dataset.initialData);
@@ -1288,8 +1269,44 @@ const ShowScoreCardPopup = () => {
         )
     );
 };
-const CopyDetailsPopup = (id) => {
-    let msg = scr[document.querySelector("div.js-portal")?.querySelector("div.simple-menu").querySelector("a").href.split("/").pop()];
+const MakeTextDetail = (data) => {
+    let detail;
+    const s = data.statistics; const m = data.maximum_statistics; const b = data.beatmap;
+    const secToMin = (s) => `${Math.floor(s/60)}:${String(s%60).padStart(2, '0')}`;
+    const isLazer = window.location.hostname.split(".")[0] === "lazer"; // assume that hostname can only be osu.ppy.sh or lazer.ppy.sh
+    switch(data.ruleset_id){
+        case 0: detail = 
+`${(s.great ?? 0) + (s.perfect ?? 0)}-${(s.ok ?? 0) + (s.good ?? 0)}-${s.meh ?? 0}-${s.miss ?? 0} ${data.max_combo ?? 0}${isLazer ? `/${(m.great ?? 0) + (m.legacy_combo_increase ?? 0)}` : ""}x
+⭕ ${b.count_circles ?? 0} 🌡️ ${b.count_sliders ?? 0} 🔄 ${b.count_spinners ?? 0}
+`; break;
+        case 1: detail = 
+`${s.great ?? 0}-${s.ok ?? 0}-${s.miss ?? 0} ${data.max_combo ?? 0}/${(s.great ?? 0) + (s.ok ?? 0) + (s.miss ?? 0)}x
+🥁 ${b.count_circles ?? 0} 🌡️ ${b.count_sliders ?? 0} 🍥 ${b.count_spinners ?? 0}
+`; break;
+        case 2: detail = isLazer ? 
+`${s.great ?? 0}/${m.great ?? 0}-${s.large_tick_hit ?? 0}/${m.large_tick_hit ?? 0}-${s.small_tick_hit ?? 0}/${m.small_tick_hit ?? 0} ${data.max_combo ?? 0}/${(m.large_tick_hit ?? 0)+(m.great ?? 0)}}x
+🍎 ${b.count_circles ?? 0} 💧 ${b.count_sliders ?? 0} 🍌 ${b.count_spinners ?? 0}
+` :
+`${s.great ?? 0}-${s.large_tick_hit ?? 0}-${s.small_tick_miss ?? 0}-${s.miss ?? 0} ${data.max_combo ?? 0}x
+🍎 ${b.count_circles ?? 0} 💧 ${b.count_sliders ?? 0} 🍌 ${b.count_spinners ?? 0}
+`; break;
+        case 3: detail =
+`${s.perfect ?? 0}-${s.great ?? 0}-${s.good ?? 0}-${s.ok ?? 0}-${s.meh ?? 0}-${s.miss ?? 0} ${data.max_combo}${isLazer ? `/${(m.perfect ?? 0) + (m.legacy_combo_increase ?? 0)}` : ""}x
+🍚 ${b.count_circles ?? 0} 🍜 ${b.count_sliders ?? 0}
+`; }
+    const scrMsg = 
+`${data.beatmapset.title}
+ [${data.beatmap.version}] ${secToMin(data.beatmap.total_length)}
+${data.total_score} ${data.rank} ${data.pp ? (data.pp >= 1 ? data.pp.toPrecision(5) : (data.pp < 0.00005 ? 0 : data.pp.toFixed(4))) : "-"}pp
+${detail}
+`;
+    return scrMsg;
+}
+const CopyDetailsPopup = () => {
+    const ele = document.querySelector("div.play-detail.play-detail--active"); if(!ele) return;
+    const id = ele.dataset.replayId;
+    const data = messageCache.get(Number(id)); if(!data) return;
+    const msg = MakeTextDetail(data);
     console.log(msg);
     CopyToClipboard(msg);
     ShowPopup(i18n("Score details copied to clipboard!"));
@@ -1303,8 +1320,7 @@ const AddPopupButton = () => {
 const ReplacePage = () => {
     if(WindowLocationChanged()){
         switch(window.location.pathname){
-            case "/new_page":
-                document.body.innerHTML = "<h1>Hello World!</h1>"
+            case "/new_page": document.body.innerHTML = "<h1>Hello World!</h1>"
         }
     }
 }
@@ -1319,21 +1335,22 @@ const OnMutation = (mulist) => {
     mut.observe(document, {childList: true, subtree: true});
 };
 const MessageFilter = (message) => {
-    info = `${message.userId},${message.mode},${message.subdomain}`;
+    const info = `${message.userId},${message.mode},${message.subdomain}`;
     switch(message.type){
         case "beatmapset_download_complete": OnBeatmapsetDownload(message); break;
         case "top_ranks":
             [message.data.pinned.items, message.data.best.items, message.data.firsts.items].forEach(items => items.forEach(item => {
                 messageCache.set(`${info},${item.ended_at}`, item);
+                messageCache.set(item.id, item);
             }));
             TopRanksWorker(message.userId, message.mode);
             break;
         case "firsts": case "pinned": case "best": case "recent":
-            message.data.forEach(item => { messageCache.set(`${info},${item.ended_at}`, item); });
+            message.data.forEach(item => { messageCache.set(`${info},${item.ended_at}`, item); messageCache.set(item.id, item); });
             TopRanksWorker(message.userId, message.mode);
             break;
         case "historical":
-            message.data.recent.items.forEach(item => { messageCache.set(`${info},${item.ended_at}`, item); });
+            message.data.recent.items.forEach(item => { messageCache.set(`${info},${item.ended_at}`, item); messageCache.set(item.id, item); });
             TopRanksWorker(message.userId, message.mode);
             break;
     }
