@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.6.6
+// @version 0.6.7
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -250,7 +250,7 @@ a.beatmap-pack-item-download-link span{
     color: unset;
 }
 `;
-let scriptContent =
+const scriptContent =
 String.raw`console.log("page script injected from osu!web enhancement");
 if(window.oldXHROpen === undefined){
     window.oldXHROpen = window.XMLHttpRequest.prototype.open;
@@ -364,15 +364,15 @@ if(!document.querySelector(`script#${scriptId}`)){
 const HTML = (tagname, attrs, ...children) => {
     if(attrs === undefined) return document.createTextNode(tagname);
     const ele = document.createElement(tagname);
-    if(attrs) for(let [key, value] of Object.entries(attrs)){
+    if(attrs) for(const [key, value] of Object.entries(attrs)){
         if(key === "eventListener"){
-            for(let listener of value){
+            for(const listener of value){
                 ele.addEventListener(listener.type, listener.listener, listener.options);
             }
         }
         else ele.setAttribute(key, value);
     }
-    for(let child of children) if(child) ele.append(child);
+    for(const child of children) if(child) ele.append(child);
     return ele;
 };
 const html = (html) => {
@@ -420,7 +420,7 @@ const Byte = (arr, iter) => {
     return arr[iter.nxtpos++];
 }
 const RankedStatus = (arr, iter) => {
-    let r = {value: Byte(arr, iter), description: ""};
+    const r = {value: Byte(arr, iter), description: ""};
     switch(r.value){
         case 1: r.description = "unsubmitted"; break;
         case 2: r.description = "pending/wip/graveyard"; break;
@@ -434,7 +434,7 @@ const RankedStatus = (arr, iter) => {
     return r;
 };
 const OsuMode = (arr, iter) => {
-    let r = {value: Byte(arr, iter), description: ""};
+    const r = {value: Byte(arr, iter), description: ""};
     switch(r.value){
         case 1: r.description = "taiko"; break;
         case 2: r.description = "catch"; break;
@@ -444,7 +444,7 @@ const OsuMode = (arr, iter) => {
     return r;
 };
 const Grade = (arr, iter) => {
-    let r = {value: Byte(arr, iter), description: ""};
+    const r = {value: Byte(arr, iter), description: ""};
     switch(r.value){
         case 0: r.description = "SSH"; break;
         case 1: r.description = "SH"; break;
@@ -462,13 +462,12 @@ const Short = (arr, iter) => (arr[iter.nxtpos++] | arr[iter.nxtpos++] << 8);
 const Int = (arr, iter) => { return arr[iter.nxtpos++] | arr[iter.nxtpos++] << 8 | arr[iter.nxtpos++] << 16 | arr[iter.nxtpos++] << 24; };
 const Long = (arr, iter) => { const r = new DataView(arr.buffer, iter.nxtpos, 8).getBigUint64(0, true); iter.nxtpos += 8; return r; };
 const ULEB128 = (arr, iter) => {
-    let value = 0n, shift = 0n;
-    while(true){
-        let peek = BigInt(arr[iter.nxtpos++]);
+    let value = 0n, shift = 0n, peek = 0n;
+    do{
+        peek = BigInt(arr[iter.nxtpos++]);
         value |= (peek & 0x7Fn) << shift;
-        if((peek & 0x80n) === 0n) break;
         shift += 7n;
-    }
+    }while(peek & 0x80n !== 0n)
     return value;
 };
 const Single = (arr, iter) => { const r = new DataView(arr.buffer, iter.nxtpos, 4).getFloat32(0, true); iter.nxtpos += 4; return r; };
@@ -490,7 +489,7 @@ const OString = (arr, iter) => {
     return value;
 };
 const IntDouble = (arr, iter) => {
-    let r = {int: 0, double: 0};
+    const r = {int: 0, double: 0};
     const m1 = arr[iter.nxtpos++];
     console.assert(m1 === 0x08, `error occurred while parsing Int-Double pair at ${iter.nxtpos - 1} with value 0x${m1.toString(16)}: should be 0x8.`);
     r.int = Int(arr, iter);
@@ -500,7 +499,7 @@ const IntDouble = (arr, iter) => {
     return r;
 };
 const IntDoubleArray = (arr, iter) => {
-    let r = new Array(Int(arr, iter));
+    const r = new Array(Int(arr, iter));
     for(let i = 0; i < r.length; i++) r[i] = IntDouble(arr, iter);
     return r;
 };
@@ -512,7 +511,7 @@ const TimingPoint = (arr, iter) => {
     };
 };
 const TimingPointArray = (arr, iter) => {
-    let r = new Array(Int(arr, iter));
+    const r = new Array(Int(arr, iter));
     for(let i = 0; i < r.length; i++) r[i] = TimingPoint(arr, iter);
     return r;
 };
@@ -591,7 +590,7 @@ class _ProgressBar{
 };
 const ProgressBar = new _ProgressBar();
 const BeatmapArray = async (arr, iter) => {
-    let r = new Array(Int(arr, iter));
+    const r = new Array(Int(arr, iter));
     for(let i = 0; i < r.length; i++){
         r[i] = Beatmap(arr, iter);
         if((i + 1) % 1000 === 0){
@@ -603,7 +602,7 @@ const BeatmapArray = async (arr, iter) => {
 };
 const OsuDb = async (arr, iter) => {
     ProgressBar.Show();
-    let r = {};
+    const r = {};
     r.version = Int(arr, iter);
     iter.osuVersion = r.version;
     r.folderCount = Int(arr, iter);
@@ -853,7 +852,7 @@ const AdjustStyle = (modestr, sectionName) => {
             return w;
         };
     };
-    let past = performance.now(), curr;
+    let cur = past = performance.now();
     let fc = new FasterCalc();
     ll.forEach((str) =>
         s.insertRule(
@@ -890,7 +889,7 @@ const AdjustStyle = (modestr, sectionName) => {
     past = performance.now();
 };
 const PPGiniIndex = () => {
-    let vals = [...document.querySelectorAll(`div.js-sortable--page[data-page-id="top_ranks"] div.play-detail-list:nth-child(4) div.play-detail.play-detail--highlightable`)]
+    const vals = [...document.querySelectorAll(`div.js-sortable--page[data-page-id="top_ranks"] div.play-detail-list:nth-child(4) div.play-detail.play-detail--highlightable`)]
     .map((ele) => {const ppele = ele.querySelector("div.play-detail__pp span"); return Number((ppele.title ? ppele.title : ppele.dataset.origTitle).replaceAll(",", ""))})
     .sort((a, b) => b - a);
     if(vals.length === 0) {
@@ -909,7 +908,7 @@ const PPGiniIndex = () => {
 const TopRanksWorker = (userId, modestr, addedNodes = [document.body]) => {
     const isLazer = window.location.hostname.split(".")[0] === "lazer"; // assume that hostname can only be osu.ppy.sh or lazer.ppy.sh
     const subdomain = isLazer ? "lazer": "osu";
-    let sectionNames = new Set();
+    const sectionNames = new Set();
     const GetSection = (ele) => {
         let count = 0;
         while(ele){
@@ -945,7 +944,6 @@ const DiffToColour = (diff, stops = [0, 0.1, 1.25, 2, 2.5, 3.3, 4.2, 4.9, 5.8, 6
         .join("")
     }`;
 };
-let scr = {};
 const ListItemWorker = (ele, data, isLazer) => {
     if(ele.getAttribute("improved") !== null) return;
     ele.setAttribute("improved", "");
@@ -1161,15 +1159,16 @@ const ListItemWorker = (ele, data, isLazer) => {
             );
             break;
         }
+        default:;
     }
 }
-let lastInitData;
+let lastInitData = null;
 const OsuLevelToExp = (n) => {
     if(n <= 100) return 5000 / 3 * (4 * n ** 3 - 3 * n ** 2 - n) + 1.25 * 1.8 ** (n - 60);
     else return 26_931_190_827 + 99_999_999_999 * (n - 100);
 }
 const OsuExpValToStr = (num) => {
-    let exp = Math.log10(num);
+    const exp = Math.log10(num);
     if(exp >= 12){
         return `${(num / 10 ** 12).toPrecision(4)}T`;
     }
@@ -1188,14 +1187,14 @@ const messageCache = new Map();
 window.messageCache = messageCache;
 const profUrlReg = /https:\/\/(?:osu|lazer)\.ppy\.sh\/users\/[0-9]+(?:|\/osu|\/taiko|\/fruits|\/mania)/;
 const ImproveProfile = (mulist) => {
-    let initData, wloc = window.location.toString();
+    const initData = null, wloc = window.location.toString();
     if(!profUrlReg.test(wloc)) return;
     const initDataEle = document.querySelector(".js-react--profile-page.osu-layout.osu-layout--full");
     if(!initDataEle) return;
     initData = JSON.parse(initDataEle.dataset.initialData);
     const userId = initData.user.id, modestr = initData.current_mode;
     if(initData !== lastInitData){
-        let ppDiv;
+        let ppDiv = null;
         document.querySelectorAll("div.value-display.value-display--plain").forEach((ele) => {
             if(ele.querySelector("div.value-display__label").textContent === "pp") ppDiv = ele;
         });
@@ -1270,9 +1269,9 @@ const ShowScoreCardPopup = () => {
     );
 };
 const MakeTextDetail = (data) => {
-    let detail;
+    let detail = "";
     const s = data.statistics; const m = data.maximum_statistics; const b = data.beatmap;
-    const secToMin = (s) => `${Math.floor(s/60)}:${String(s%60).padStart(2, '0')}`;
+    const secToMin = (t) => `${Math.floor(t/60)}:${String(t%60).padStart(2, '0')}`;
     const isLazer = window.location.hostname.split(".")[0] === "lazer"; // assume that hostname can only be osu.ppy.sh or lazer.ppy.sh
     switch(data.ruleset_id){
         case 0: detail = 
@@ -1293,7 +1292,9 @@ const MakeTextDetail = (data) => {
         case 3: detail =
 `${s.perfect ?? 0}-${s.great ?? 0}-${s.good ?? 0}-${s.ok ?? 0}-${s.meh ?? 0}-${s.miss ?? 0} ${data.max_combo}${isLazer ? `/${(m.perfect ?? 0) + (m.legacy_combo_increase ?? 0)}` : ""}x
 🍚 ${b.count_circles ?? 0} 🍜 ${b.count_sliders ?? 0}
-`; }
+`; 
+        default:;
+}
     const scrMsg = 
 `${data.beatmapset.title}
  [${data.beatmap.version}] ${secToMin(data.beatmap.total_length)}
@@ -1317,16 +1318,8 @@ const AddPopupButton = () => {
     // p.append(HTML("button", {class: "score-card-popup-button simple-menu__item", type: "button", eventListener: [{type: "click", listener: ShowScoreCardPopup}]}, HTML("Popup")));
     p.append(HTML("button", {class: "score-card-popup-button simple-menu__item", type: "button", eventListener: [{type: "click", listener: CopyDetailsPopup}]}, HTML(i18n("Copy Text Details"))));
 };
-const ReplacePage = () => {
-    if(WindowLocationChanged()){
-        switch(window.location.pathname){
-            case "/new_page": document.body.innerHTML = "<h1>Hello World!</h1>"
-        }
-    }
-}
 const OnMutation = (mulist) => {
     mut.disconnect();
-    ReplacePage();
     AddMenu();
     FilterBeatmapSet();
     ImproveBeatmapPlaycountItems();
@@ -1353,6 +1346,7 @@ const MessageFilter = (message) => {
             message.data.recent.items.forEach(item => { messageCache.set(`${info},${item.ended_at}`, item); messageCache.set(item.id, item); });
             TopRanksWorker(message.userId, message.mode);
             break;
+        default:;
     }
 }
 const WindowMessageFilter = (event) => {
@@ -1374,8 +1368,8 @@ const OnClick = (event) => {
     }
 }
 //document.addEventListener("click", OnClick);
-const curLocale = currentLocale;
-if (locales.hasOwnProperty(curLocale)) {
+const curLocale = window.currentLocale;
+if (curLocale && locales[curLocale]) {
     console.log("localization available");
     i18n.translator.add(locales[curLocale]);
 }
