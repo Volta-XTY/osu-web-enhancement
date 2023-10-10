@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.6.9
+// @version 0.6.10
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -649,7 +649,7 @@ const ULEB128 = (arr, iter) => {
         peek = BigInt(arr[iter.nxtpos++]);
         value |= (peek & 0x7Fn) << shift;
         shift += 7n;
-    }while(peek & 0x80n !== 0n)
+    }while((peek & 0x80n) !== 0n)
     return value;
 };
 const Single = (arr, iter) => { const r = new DataView(arr.buffer, iter.nxtpos, 4).getFloat32(0, true); iter.nxtpos += 4; return r; };
