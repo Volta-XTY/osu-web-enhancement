@@ -1593,10 +1593,7 @@ window.addEventListener("message", WindowMessageFilter);
 const mut = new MutationObserver(OnMutation);
 mut.observe(document, {childList: true, subtree: true});
 InsertStyleSheet();
-//{id, mode} -> (bmid -> record)
 console.log("osu!web enhancement loaded");
-
-
 // below are test code
 /*
 const osusrc = "https://i.ppy.sh/bde5906f8f985126f4ea624d3eb14c8702883aa2/68747470733a2f2f6f73752e7070792e73682f77696b692f696d616765732f536b696e6e696e672f496e746572666163652f696d672f6d6f64652d6f73752e706e67";
