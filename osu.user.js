@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.6.10
+// @version 0.6.11
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
