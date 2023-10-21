@@ -1404,7 +1404,7 @@ const AddBPAnalyzeSection = () => {
 const ImproveProfile = (mulist) => {
     const wloc = window.location.toString();
     if(!profUrlReg.test(wloc)) return;
-    AddBPAnalyzeSection();
+    //AddBPAnalyzeSection();
     const initDataEle = document.querySelector(".js-react--profile-page.osu-layout.osu-layout--full");
     if(!initDataEle) return;
     const initData = JSON.parse(initDataEle.dataset.initialData);
