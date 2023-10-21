@@ -461,6 +461,32 @@ if(window.oldXHROpen === undefined){
     };
 }`;
 const locales = {
+    "en": {
+        "values": {
+            "Owned": "Owned",
+            "Download": "Download",
+            "pp Accuracy": "pp Accuracy",
+            "V1 Accuracy": "V1 Accuracy",
+            "V2 Accuracy": "V2 Accuracy",
+            "Lazer Accuracy": "Lazer Accuracy",
+            "Combo": "Combo",
+            "Combo/Max Combo": "Combo/Max Combo",
+            "Import osu!.db": "Import osu!.db",
+            "Check for update": "Check for update",
+            "Calculate pp Gini index": "Calculate pp Gini index",
+            "Go to GreasyFork page": "Go to GreasyFork page",
+            "Copy Text Details": "Copy Text Details",
+            "Could not find best play data": "Could not find best play data",
+            "The latest version is already installed!": "The latest version is already installed!",
+            "Script is already busy reading a osu!.db file.": "Script is already busy reading a osu!.db file.",
+            "There are still remaining unread bytes, something may be wrong.": "There are still remaining unread bytes, something may be wrong.",
+            "Score details copied to clipboard!": "Score details copied to clipboard!",
+            "%{pc} of total pp": "%{pc} of total pp",
+            "Your pp Gini index of bp%{bp} is %{val}.": "Your pp Gini index of bp%{bp} is %{val}.",
+            "Finished reading osu!.db in %{time} ms.": "Finished reading osu!.db in %{time} ms.",
+            "MAX: %{MAX} 300: %{MAX}": "MAX: %{MAX} 300: %{MAX}",
+        }
+    },
     "zh": {
         "values": {
             "Owned": "已获得",
@@ -483,7 +509,8 @@ const locales = {
             "Score details copied to clipboard!": "分数信息已复制到剪贴板！",
             "%{pc} of total pp": "占总 pp 的 %{pc}",
             "Your pp Gini index of bp%{bp} is %{val}.": "BP%{bp} 的 pp 基尼指数为 %{val}。",
-            "Finished reading osu!.db in %{time} ms.": "osu!.db 读取完毕，用时 %{time}ms。"
+            "Finished reading osu!.db in %{time} ms.": "osu!.db 读取完毕，用时 %{time}ms。",
+            "MAX: %{MAX} 300: %{MAX}": "MAX: %{MAX} 300: %{MAX}",
         }
     },
     "zh-tw": {
@@ -508,7 +535,8 @@ const locales = {
             "Score details copied to clipboard!": "分數訊息已複製到剪貼簿！",
             "%{pc} of total pp": "佔總 pp 的 %{pc}",
             "Your pp Gini index of bp%{bp} is %{val}.": "BP%{bp} 的 pp 基尼指數為 %{val}。",
-            "Finished reading osu!.db in %{time} ms.": "osu!.db 讀取完畢，用時 %{time}ms。"
+            "Finished reading osu!.db in %{time} ms.": "osu!.db 讀取完畢，用時 %{time}ms。",
+            "MAX: %{MAX} 300: %{MAX}": "MAX: %{MAX} 300: %{MAX}",
         }
     },
     "ja": {
@@ -533,7 +561,8 @@ const locales = {
             "Score details copied to clipboard!": "スコア詳細をクリップボードにコピー！",
             "%{pc} of total pp": "全 pp の %{pc}",
             "Your pp Gini index of bp%{bp} is %{val}.": "BP%{bp} の pp ジニ指数は %{val} です。",
-            "Finished reading osu!.db in %{time} ms.": "osu!.db の読み取りを %{time}ms で完了しました。"
+            "Finished reading osu!.db in %{time} ms.": "osu!.db の読み取りを %{time}ms で完了しました。",
+            "MAX: %{MAX} 300: %{MAX}": "MAX: %{MAX} 300: %{MAX}",
         }
     }
 };
@@ -547,6 +576,7 @@ const HTML = (tagname, attrs, ...children) => {
     if(attrs === undefined) return document.createTextNode(tagname);
     const ele = document.createElement(tagname);
     if(attrs) for(const [key, value] of Object.entries(attrs)){
+        if(value === null || value === undefined) continue;
         if(key === "eventListener"){
             for(const listener of value){
                 ele.addEventListener(listener.type, listener.listener, listener.options);
@@ -562,7 +592,6 @@ const html = (html) => {
     t.innerHTML = html;
     return t.content.firstElementChild;
 };
-const PostMessage = (msg) => { console.error(msg); };
 const OsuMod = {
     NoFail:         1 << 0,
     Easy:           1 << 1,
@@ -772,10 +801,13 @@ class _ProgressBar{
 };
 const ProgressBar = new _ProgressBar();
 const BeatmapArray = async (arr, iter) => {
+    const t = 200;
     const r = new Array(Int(arr, iter));
+    let l = performance.now();
     for(let i = 0; i < r.length; i++){
         r[i] = Beatmap(arr, iter);
-        if((i + 1) % 1000 === 0){
+        if(performance.now() - l > t){
+            l = performance.now();
             ProgressBar.Progress((i + 1) / (r.length));
             await new Promise((res, rej) => setTimeout(() => res(), 0));
         }
@@ -1116,6 +1148,9 @@ const DiffToColour = (diff, stops = [0, 0.1, 1.25, 2, 2.5, 3.3, 4.2, 4.9, 5.8, 6
         .join("")
     }`;
 };
+const CustomToPrecision = (number, precision) => {
+    return number >= 1 ? number.toPrecision(precision) : (number < (10 ** (-precision + 1) / 2) ? 0 : number.toFixed(precision - 1));
+} 
 const ListItemWorker = (ele, data, isLazer) => {
     if(ele.getAttribute("improved") !== null) return;
     ele.setAttribute("improved", "");
@@ -1123,8 +1158,8 @@ const ListItemWorker = (ele, data, isLazer) => {
     if(data.pp){
         data.pp = Number(data.pp);
         const pptext = ele.querySelector(".play-detail__pp > span").childNodes[0];
-        pptext.nodeValue = data.pp >= 1 ? data.pp.toPrecision(5) : (data.pp < 0.00005 ? 0 : data.pp.toFixed(4));
-        if(data.weight) pptext.title = i18n("%{pc} of total pp", {pc: data.weight.pp >= 1 ? data.weight.pp.toPrecision(5) : (data.weight.pp < 0.00005 ? 0 : data.weight.pp.toFixed(4))});
+        pptext.nodeValue = CustomToPrecision(data.pp, 5);
+        if(data.weight) pptext.title = i18n("%{pc} of total pp", {pc: CustomToPrecision(data.weight.pp, 5)});
     }
     const left = ele.querySelector("div.play-detail__group.play-detail__group--top");
     const leftc = HTML("div", {class: "play-detail__group--background", style: `background-image: url(https://assets.ppy.sh/beatmaps/${data.beatmap.beatmapset_id}/covers/card@2x.jpg);`});
@@ -1301,12 +1336,12 @@ const ListItemWorker = (ele, data, isLazer) => {
                 ),
             );
             if(data.pp){
-                const lostpp = data.pp * (0.2 / (Math.min(Math.max(v2acc, 0.8), 1) - 0.8) - 1);
-                ele.querySelector(".play-detail__pp").appendChild(HTML("span", {class: "lost-pp"}, HTML(`-${lostpp.toPrecision(4)}`)));
+                const lostpp = CustomToPrecision(data.pp * (0.2 / (Math.min(Math.max(v2acc, 0.8), 1) - 0.8) - 1), 4);
+                ele.querySelector(".play-detail__pp").appendChild(HTML("span", {class: "lost-pp"}, HTML(lostpp === 0 ? "MAX" : `-${lostpp}`)));
             }
             const M_300 = Number(data.statistics.perfect) / Math.max(Number(data.statistics.great), 1);
             db.replaceChildren(
-                HTML("span", {class: "score-detail score-detail-mania-max-300"},
+                HTML("span", {class: "score-detail score-detail-mania-max-300", title: i18n("MAX: %{perfect}, 300: %{great}", data.statistics)},
                     HTML("span", {class: "mania-max"}, HTML("M")),
                     HTML("/"),
                     HTML("span", {class: "mania-300"}, HTML("300")),
@@ -1358,9 +1393,18 @@ const OsuExpValToStr = (num) => {
 const messageCache = new Map();
 window.messageCache = messageCache;
 const profUrlReg = /https:\/\/(?:osu|lazer)\.ppy\.sh\/users\/[0-9]+(?:|\/osu|\/taiko|\/fruits|\/mania)/;
+const AddBPAnalyzeSection = () => {
+    if(document.getElementById("bp-analyze-section")) return;
+    const h3 = document.querySelector('div.js-sortable--page[data-page-id="top_ranks"] h3.title.title--page-extra-small:nth-child(3)');
+    if(!h3) return;
+    h3.insertAdjacentElement("beforeend",
+        HTML("span", {class: "title__count", id: "bp-analyze-section"}, i18n("Show bp analytic"))
+    );
+};
 const ImproveProfile = (mulist) => {
     const wloc = window.location.toString();
     if(!profUrlReg.test(wloc)) return;
+    AddBPAnalyzeSection();
     const initDataEle = document.querySelector(".js-react--profile-page.osu-layout.osu-layout--full");
     if(!initDataEle) return;
     const initData = JSON.parse(initDataEle.dataset.initialData);
