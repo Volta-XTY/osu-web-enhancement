@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.6.11
+// @version 0.6.12
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -17,7 +17,8 @@
     __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
   Translator = (function() {
     function Translator() {
-      this.translate = __bind(this.translate, this);      this.data = {
+      this.translate = __bind(this.translate, this);
+      this.data = {
         values: {},
         contexts: []
       };
@@ -58,8 +59,8 @@
         }
       }
       if (isObject(text)) {
-        if (isObject(text['i18n'])) {
-          text = text['i18n'];
+        if (isObject(text.i18n)) {
+          text = text.i18n;
         }
         return this.translateHash(text, context);
       } else {
@@ -1266,6 +1267,10 @@ const ListItemWorker = (ele, data, isLazer) => {
             if (isLazer) {
                 const cur = [data.statistics.great ?? 0, data.statistics.large_tick_hit ?? 0, data.statistics.small_tick_hit ?? 0];
                 const mx = [data.maximum_statistics.great ?? 0, data.maximum_statistics.large_tick_hit ?? 0, data.maximum_statistics.small_tick_hit ?? 0];
+                if(data.pp){
+                    const maxpp = data.pp / Math.pow(data.accuracy, 5.5) / Math.pow(data.max_combo / (mx[0]+mx[1]), 0.8) / Math.pow(0.97, data.statistics.miss);
+                    ele.querySelector(".play-detail__pp").appendChild(HTML("span", {class: "lost-pp"}, HTML(maxpp === data.pp ? "MAX" : `-${CustomToPrecision(maxpp - data.pp, 4)}`)));
+                }
                 du.replaceChildren(
                     HTML("span", {class: "play-detail__before"}),
                     HTML("span", {class: "play-detail__Accuracy", title: i18n(`Lazer Accuracy`)}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
@@ -1291,11 +1296,15 @@ const ListItemWorker = (ele, data, isLazer) => {
                     )
                 );
             } else {
+                if(data.pp){
+                    const maxpp = data.pp / Math.pow(data.accuracy, 5.5) / Math.pow(data.max_combo / ((data.statistics.great ?? 0) + (data.statistics.large_tick_hit ?? 0) + (data.statistics.miss ?? 0)), 0.8) / Math.pow(0.97, data.statistics.miss);
+                    ele.querySelector(".play-detail__pp").appendChild(HTML("span", {class: "lost-pp"}, HTML(maxpp === data.pp ? "MAX" : `-${CustomToPrecision(maxpp - data.pp, 4)}`)));
+                }
                 du.replaceChildren(
                     HTML("span", {class: "play-detail__before"}),
                     HTML("span", {class: "play-detail__Accuracy", title: i18n(`V1 Accuracy`)}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
                     HTML("span", {class: "play-detail__combo", title: i18n(`Combo`)},
-                        HTML("span", {class: ""}, HTML(`${data.max_combo}`)),
+                        HTML("span", {class: `combo ${(data.legacy_perfect ? "legacy-perfect-combo" : "")}`}, HTML(`${data.max_combo}`)),
                         HTML("x")
                     ),
                 );
@@ -1586,7 +1595,7 @@ const OnClick = (event) => {
 //document.addEventListener("click", OnClick);
 const curLocale = window.currentLocale;
 if (curLocale && locales[curLocale]) {
-    console.log("localization available");
+    console.log("script localization available");
     i18n.translator.add(locales[curLocale]);
 }
 window.addEventListener("message", WindowMessageFilter);
