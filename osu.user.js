@@ -1269,7 +1269,7 @@ const ListItemWorker = (ele, data, isLazer) => {
                 const mx = [data.maximum_statistics.great ?? 0, data.maximum_statistics.large_tick_hit ?? 0, data.maximum_statistics.small_tick_hit ?? 0];
                 if(data.pp){
                     const maxpp = data.pp / Math.pow(data.accuracy, 5.5) / Math.pow(data.max_combo / (mx[0]+mx[1]), 0.8) / Math.pow(0.97, data.statistics.miss);
-                    ele.querySelector(".play-detail__pp").appendChild(HTML("span", {class: "lost-pp"}, HTML(maxpp === data.pp ? "MAX" : `-${CustomToPrecision(maxpp - data.pp, 4)}`)));
+                    ele.querySelector(".play-detail__pp").appendChild(HTML("span", {class: "lost-pp", title: maxpp === data.pp ? "☆" : `-${CustomToPrecision((maxpp - data.pp) / maxpp * 100, 4)}%`}, HTML(maxpp === data.pp ? "MAX" : `-${CustomToPrecision(maxpp - data.pp, 4)}`)));
                 }
                 du.replaceChildren(
                     HTML("span", {class: "play-detail__before"}),
@@ -1298,7 +1298,7 @@ const ListItemWorker = (ele, data, isLazer) => {
             } else {
                 if(data.pp){
                     const maxpp = data.pp / Math.pow(data.accuracy, 5.5) / Math.pow(data.max_combo / ((data.statistics.great ?? 0) + (data.statistics.large_tick_hit ?? 0) + (data.statistics.miss ?? 0)), 0.8) / Math.pow(0.97, data.statistics.miss);
-                    ele.querySelector(".play-detail__pp").appendChild(HTML("span", {class: "lost-pp"}, HTML(maxpp === data.pp ? "MAX" : `-${CustomToPrecision(maxpp - data.pp, 4)}`)));
+                    ele.querySelector(".play-detail__pp").appendChild(HTML("span", {class: "lost-pp", title: maxpp === data.pp ? "☆" : `-${CustomToPrecision((maxpp - data.pp) / maxpp * 100, 4)}%`}, HTML(maxpp === data.pp ? "MAX" : `-${CustomToPrecision(maxpp - data.pp, 4)}`)));
                 }
                 du.replaceChildren(
                     HTML("span", {class: "play-detail__before"}),
@@ -1345,8 +1345,8 @@ const ListItemWorker = (ele, data, isLazer) => {
                 ),
             );
             if(data.pp){
-                const lostpp = CustomToPrecision(data.pp * (0.2 / (Math.min(Math.max(v2acc, 0.8), 1) - 0.8) - 1), 4);
-                ele.querySelector(".play-detail__pp").appendChild(HTML("span", {class: "lost-pp"}, HTML(lostpp === 0 ? "MAX" : `-${lostpp}`)));
+                const lostpp = data.pp * (0.2 / (Math.min(Math.max(v2acc, 0.8), 1) - 0.8) - 1);
+                ele.querySelector(".play-detail__pp").appendChild(HTML("span", {class: "lost-pp", title: lostpp === 0 ? "☆" : `-${CustomToPrecision(lostpp / (lostpp + data.pp) * 100, 4)}%`}, HTML(lostpp === 0 ? "MAX" : `-${CustomToPrecision(lostpp, 4)}`)));
             }
             const M_300 = Number(data.statistics.perfect) / Math.max(Number(data.statistics.great), 1);
             db.replaceChildren(
