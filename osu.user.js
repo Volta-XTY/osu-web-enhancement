@@ -432,6 +432,15 @@ a.beatmap-pack-item-download-link span{
 .play-detail.play-detail--highlightable.audio-player__button:hover{
     color: unset;
 }
+.lostpp-table{
+    margin: .5em;
+    text-align: center;
+}
+.lostpp-table-grid{
+    border: 1px solid #fff;
+    padding: .2em;
+    text-align: center;
+}
 `;
 const scriptContent =
 String.raw`console.log("page script injected from osu!web enhancement");
@@ -1151,7 +1160,7 @@ const DiffToColour = (diff, stops = [0, 0.1, 1.25, 2, 2.5, 3.3, 4.2, 4.9, 5.8, 6
 };
 const CustomToPrecision = (number, precision) => {
     return number >= 1 ? number.toPrecision(precision) : (number < (10 ** (-precision + 1) / 2) ? 0 : number.toFixed(precision - 1));
-} 
+}
 const ListItemWorker = (ele, data, isLazer) => {
     if(ele.getAttribute("improved") !== null) return;
     ele.setAttribute("improved", "");
@@ -1264,12 +1273,17 @@ const ListItemWorker = (ele, data, isLazer) => {
             break;
         }
         case 2:{
+            const per = (a) => `${CustomToPrecision(a * 100, 4)}%`;
+            const makeTitle = (a, b, c, d) => `Total Loss: ${per(a)}<table class='lostpp-table'><thead><tr><th class='lostpp-table-grid'>Acc</th><th class='lostpp-table-grid'>Combo</th><th class='lostpp-table-grid'>Miss</th></tr></thead><tr><td class='lostpp-table-grid'>${per(b)}</td><td class='lostpp-table-grid'>${per(c)}</td><td class='lostpp-table-grid'>${per(d)}</td></tr></table>`;
             if (isLazer) {
                 const cur = [data.statistics.great ?? 0, data.statistics.large_tick_hit ?? 0, data.statistics.small_tick_hit ?? 0];
                 const mx = [data.maximum_statistics.great ?? 0, data.maximum_statistics.large_tick_hit ?? 0, data.maximum_statistics.small_tick_hit ?? 0];
                 if(data.pp){
-                    const maxpp = data.pp / Math.pow(data.accuracy, 5.5) / Math.pow(data.max_combo / (mx[0]+mx[1]), 0.8) / Math.pow(0.97, data.statistics.miss);
-                    ele.querySelector(".play-detail__pp").appendChild(HTML("span", {class: "lost-pp", title: maxpp === data.pp ? "☆" : `-${CustomToPrecision((maxpp - data.pp) / maxpp * 100, 4)}%`}, HTML(maxpp === data.pp ? "MAX" : `-${CustomToPrecision(maxpp - data.pp, 4)}`)));
+                    const accLost = 1 - Math.pow(data.accuracy, 5.5);
+                    const comboLost = 1 - Math.pow(data.max_combo / (mx[0]+mx[1]), 0.8);
+                    const missLost = 1 - Math.pow(0.97, data.statistics.miss);
+                    const maxpp = data.pp / (1 - accLost) / (1 - comboLost) / (1 - missLost);
+                    ele.querySelector(".play-detail__pp").appendChild(HTML("div", {class: "lost-pp", title: "", "data-tooltip-hoverable": "1", "data-html-title": maxpp === data.pp ? "MAX" : makeTitle((maxpp - data.pp) / maxpp, accLost, comboLost, missLost)}, HTML(maxpp === data.pp ? "MAX" : `-${CustomToPrecision(maxpp - data.pp, 4)}`)));
                 }
                 du.replaceChildren(
                     HTML("span", {class: "play-detail__before"}),
@@ -1297,8 +1311,11 @@ const ListItemWorker = (ele, data, isLazer) => {
                 );
             } else {
                 if(data.pp){
-                    const maxpp = data.pp / Math.pow(data.accuracy, 5.5) / Math.pow(data.max_combo / ((data.statistics.great ?? 0) + (data.statistics.large_tick_hit ?? 0) + (data.statistics.miss ?? 0)), 0.8) / Math.pow(0.97, data.statistics.miss);
-                    ele.querySelector(".play-detail__pp").appendChild(HTML("span", {class: "lost-pp", title: maxpp === data.pp ? "☆" : `-${CustomToPrecision((maxpp - data.pp) / maxpp * 100, 4)}%`}, HTML(maxpp === data.pp ? "MAX" : `-${CustomToPrecision(maxpp - data.pp, 4)}`)));
+                    const accLost = 1 - Math.pow(data.accuracy, 5.5);
+                    const comboLost = 1 - Math.pow(data.max_combo / ((data.statistics.great ?? 0) + (data.statistics.large_tick_hit ?? 0) + (data.statistics.miss ?? 0)), 0.8);
+                    const missLost = 1 - Math.pow(0.97, data.statistics.miss);
+                    const maxpp = data.pp / (1 - accLost) / (1 - comboLost) / (1 - missLost);
+                    ele.querySelector(".play-detail__pp").appendChild(HTML("div", {class: "lost-pp", title: "", "data-tooltip-hoverable": "1", "data-html-title": maxpp === data.pp ? "MAX" : makeTitle((maxpp - data.pp) / maxpp, accLost, comboLost, missLost)}, HTML(maxpp === data.pp ? "MAX" : `-${CustomToPrecision(maxpp - data.pp, 4)}`)));
                 }
                 du.replaceChildren(
                     HTML("span", {class: "play-detail__before"}),
@@ -1330,6 +1347,8 @@ const ListItemWorker = (ele, data, isLazer) => {
             break;
         }
         case 3:{
+            const per = (a) => `${CustomToPrecision(a * 100, 4)}%`;
+            const makeTitle = (a, b) => `Total Loss: ${per(a)}<table class='lostpp-table'><thead><tr><th class='lostpp-table-grid'>Acc</th></tr></thead><tr><td class='lostpp-table-grid'>${per(b)}</td></tr></table>`;
             const v2acc = (320*data.statistics.perfect+300*data.statistics.great+200*data.statistics.good+100*data.statistics.ok+50*data.statistics.meh)/(320*(data.statistics.perfect+data.statistics.great+data.statistics.good+data.statistics.ok+data.statistics.meh+data.statistics.miss));
             const MCombo = (data.maximum_statistics.perfect ?? 0) + (data.maximum_statistics.legacy_combo_increase ?? 0);
             const isMCombo = isLazer ? data.max_combo >= MCombo : data.legacy_perfect;
@@ -1345,8 +1364,9 @@ const ListItemWorker = (ele, data, isLazer) => {
                 ),
             );
             if(data.pp){
-                const lostpp = data.pp * (0.2 / (Math.min(Math.max(v2acc, 0.8), 1) - 0.8) - 1);
-                ele.querySelector(".play-detail__pp").appendChild(HTML("span", {class: "lost-pp", title: lostpp === 0 ? "☆" : `-${CustomToPrecision(lostpp / (lostpp + data.pp) * 100, 4)}%`}, HTML(lostpp === 0 ? "MAX" : `-${CustomToPrecision(lostpp, 4)}`)));
+                const accLost = 5 - Math.min(Math.max(v2acc, 0.8), 1) / 0.2;
+                const maxpp = data.pp / (1 - accLost);
+                ele.querySelector(".play-detail__pp").appendChild(HTML("div", {class: "lost-pp", title: "", "data-tooltip-hoverable": "1", "data-html-title": maxpp === data.pp ? "MAX" : makeTitle((maxpp - data.pp) / maxpp, accLost)}, HTML(maxpp === data.pp ? "MAX" : `-${CustomToPrecision(maxpp - data.pp, 4)}`)));
             }
             const M_300 = Number(data.statistics.perfect) / Math.max(Number(data.statistics.great), 1);
             db.replaceChildren(
@@ -1499,15 +1519,15 @@ const MakeTextDetail = (data) => {
     const secToMin = (t) => `${Math.floor(t/60)}:${String(t%60).padStart(2, '0')}`;
     const isLazer = window.location.hostname.split(".")[0] === "lazer"; // assume that hostname can only be osu.ppy.sh or lazer.ppy.sh
     switch(data.ruleset_id){
-        case 0: detail = 
+        case 0: detail =
 `${(s.great ?? 0) + (s.perfect ?? 0)}-${(s.ok ?? 0) + (s.good ?? 0)}-${s.meh ?? 0}-${s.miss ?? 0} ${data.max_combo ?? 0}${isLazer ? `/${(m.great ?? 0) + (m.legacy_combo_increase ?? 0)}` : ""}x
 ⭕ ${b.count_circles ?? 0} 🌡️ ${b.count_sliders ?? 0} 🔄 ${b.count_spinners ?? 0}
 `; break;
-        case 1: detail = 
+        case 1: detail =
 `${s.great ?? 0}-${s.ok ?? 0}-${s.miss ?? 0} ${data.max_combo ?? 0}/${(s.great ?? 0) + (s.ok ?? 0) + (s.miss ?? 0)}x
 🥁 ${b.count_circles ?? 0} 🌡️ ${b.count_sliders ?? 0} 🍥 ${b.count_spinners ?? 0}
 `; break;
-        case 2: detail = isLazer ? 
+        case 2: detail = isLazer ?
 `${s.great ?? 0}/${m.great ?? 0}-${s.large_tick_hit ?? 0}/${m.large_tick_hit ?? 0}-${s.small_tick_hit ?? 0}/${m.small_tick_hit ?? 0} ${data.max_combo ?? 0}/${(m.large_tick_hit ?? 0)+(m.great ?? 0)}}x
 🍎 ${b.count_circles ?? 0} 💧 ${b.count_sliders ?? 0} 🍌 ${b.count_spinners ?? 0}
 ` :
@@ -1520,7 +1540,7 @@ const MakeTextDetail = (data) => {
 `; break;
         default:;
 }
-    const scrMsg = 
+    const scrMsg =
 `${data.beatmapset.title}
  [${data.beatmap.version}] ${secToMin(data.beatmap.total_length)}
 ${data.total_score} ${data.rank} ${data.pp ? (data.pp >= 1 ? data.pp.toPrecision(5) : (data.pp < 0.00005 ? 0 : data.pp.toFixed(4))) : "-"}pp
