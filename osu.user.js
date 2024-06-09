@@ -431,6 +431,15 @@ a.beatmap-pack-item-download-link span{
 .play-detail.play-detail--highlightable.audio-player__button:hover{
     color: unset;
 }
+.sort-detail__items{
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.sort-detail__item{
+    border-radius: 4px;
+    margin: 5px;
+}
 `;
 const scriptContent =
 String.raw`console.log("page script injected from osu!web enhancement");
@@ -485,6 +494,9 @@ const locales = {
             "Your pp Gini index of bp%{bp} is %{val}.": "Your pp Gini index of bp%{bp} is %{val}.",
             "Finished reading osu!.db in %{time} ms.": "Finished reading osu!.db in %{time} ms.",
             "MAX: %{MAX} 300: %{MAX}": "MAX: %{MAX} 300: %{MAX}",
+            "Unable to copy score detail to clipboard, check console for more info.": "Unable to copy score detail to clipboard, check console for more info.",
+            "Show bp analytic": "Show bp analytic",
+            "Close bp analytic": "Close bp analytic",
         }
     },
     "zh": {
@@ -572,12 +584,22 @@ if(!document.querySelector(`script#${scriptId}`)){
     script.textContent = scriptContent;
     document.body.appendChild(script);
 }
+const persistentEventListeners = new Map();
 const HTML = (tagname, attrs, ...children) => {
     if(attrs === undefined) return document.createTextNode(tagname);
     const ele = document.createElement(tagname);
     if(attrs) for(const [key, value] of Object.entries(attrs)){
         if(value === null || value === undefined) continue;
-        if(key === "eventListener"){
+        if(key.charAt(0) === "_"){
+            const type = key.slice(1);
+            ele.addEventListener(type, value);
+        }
+        else if(key.charAt(0) === "#" && ele.getAttribute("id") !== null){
+            const type = key.slice(1);
+            persistentEventListeners.set(ele.getAttribute("id"), {type: type, value: value});
+            ele.addEventListener(type, value);
+        }
+        else if(key === "eventListener"){
             for(const listener of value){
                 ele.addEventListener(listener.type, listener.listener, listener.options);
             }
@@ -1321,13 +1343,14 @@ const ListItemWorker = (ele, data, isLazer) => {
             break;
         }
         case 3:{
-            const v2acc = (320*data.statistics.perfect+300*data.statistics.great+200*data.statistics.good+100*data.statistics.ok+50*data.statistics.meh)/(320*(data.statistics.perfect+data.statistics.great+data.statistics.good+data.statistics.ok+data.statistics.meh+data.statistics.miss));
+            const ppAcc = (320*data.statistics.perfect+300*data.statistics.great+200*data.statistics.good+100*data.statistics.ok+50*data.statistics.meh)/(320*(data.statistics.perfect+data.statistics.great+data.statistics.good+data.statistics.ok+data.statistics.meh+data.statistics.miss));
+            const v2Acc = (305*data.statistics.perfect+300*data.statistics.great+200*data.statistics.good+100*data.statistics.ok+50*data.statistics.meh)/(305*(data.statistics.perfect+data.statistics.great+data.statistics.good+data.statistics.ok+data.statistics.meh+data.statistics.miss));
             const MCombo = (data.maximum_statistics.perfect ?? 0) + (data.maximum_statistics.legacy_combo_increase ?? 0);
             const isMCombo = isLazer ? data.max_combo >= MCombo : data.legacy_perfect;
             du.replaceChildren(
                 HTML("span", {class: "play-detail__before"}),
-                HTML("span", {class: "play-detail__Accuracy2", title: i18n(`pp Accuracy`)}, HTML(`${(v2acc * 100).toFixed(2)}%`)),
-                HTML("span", {class: "play-detail__Accuracy", title: i18n(`${isLazer ? "Lazer" : "V1"} Accuracy`)}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
+                HTML("span", {class: "play-detail__Accuracy2", title: i18n(`pp Accuracy`)}, HTML(`${(ppAcc * 100).toFixed(2)}%`)),
+                HTML("span", {class: "play-detail__Accuracy", title: i18n(`V2 Accuracy`)}, HTML(`${(((data.rank === "D" && data.accuracy === 0) ? v2Acc :data.accuracy) * 100).toFixed(2)}%`)),
                 HTML("span", {class: "play-detail__combo", title: i18n(`Combo${isLazer ? "/Max Combo" : ""}`)},
                     HTML("span", {class: `combo ${isMCombo ? "legacy-perfect-combo" : ""}`}, HTML(`${data.max_combo}`)),
                     isLazer ? HTML("/") : null,
@@ -1336,7 +1359,7 @@ const ListItemWorker = (ele, data, isLazer) => {
                 ),
             );
             if(data.pp){
-                const lostpp = CustomToPrecision(data.pp * (0.2 / (Math.min(Math.max(v2acc, 0.8), 1) - 0.8) - 1), 4);
+                const lostpp = CustomToPrecision(data.pp * (0.2 / (Math.min(Math.max(ppAcc, 0.8), 1) - 0.8) - 1), 4);
                 ele.querySelector(".play-detail__pp").appendChild(HTML("span", {class: "lost-pp"}, HTML(lostpp === 0 ? "MAX" : `-${lostpp}`)));
             }
             const M_300 = Number(data.statistics.perfect) / Math.max(Number(data.statistics.great), 1);
@@ -1393,18 +1416,28 @@ const OsuExpValToStr = (num) => {
 const messageCache = new Map();
 window.messageCache = messageCache;
 const profUrlReg = /https:\/\/(?:osu|lazer)\.ppy\.sh\/users\/[0-9]+(?:|\/osu|\/taiko|\/fruits|\/mania)/;
-const AddBPAnalyzeSection = () => {
-    if(document.getElementById("bp-analyze-section")) return;
-    const h3 = document.querySelector('div.js-sortable--page[data-page-id="top_ranks"] h3.title.title--page-extra-small:nth-child(3)');
-    if(!h3) return;
-    h3.insertAdjacentElement("beforeend",
-        HTML("span", {class: "title__count", id: "bp-analyze-section"}, i18n("Show bp analytic"))
-    );
+class SortGroup {
+    rules = [];
+    constructor(){
+
+    }
+    Show = () => {
+        if(document.querySelector(".sort-detail__items")) return;
+        const h3 = document.querySelector('div.js-sortable--page[data-page-id="top_ranks"] h3.title.title--page-extra-small:nth-child(3)');
+        h3.insertAdjacentElement("afterend",
+            HTML("div", {class: "sort-detail__items"},
+                HTML("div", {class: "sort-detail__item sort-detail__item--title"}, i18n("Sort by")),
+            )
+        );
+    };
+    AddRule = (name) => {
+        this.rules.push(name);
+    };
 };
 const ImproveProfile = (mulist) => {
     const wloc = window.location.toString();
     if(!profUrlReg.test(wloc)) return;
-    //AddBPAnalyzeSection();
+    //SortGroup.Show();
     const initDataEle = document.querySelector(".js-react--profile-page.osu-layout.osu-layout--full");
     if(!initDataEle) return;
     const initData = JSON.parse(initDataEle.dataset.initialData);
@@ -1459,31 +1492,15 @@ const ImproveBeatmapPlaycountItems = () => {
         else d.append(b);
     }
 }
-const CloseScoreCardPopup = () => {
-    document.querySelector("div.score-card-popup-window").remove();
-}
 const CopyToClipboard = (txt) => {
-	const t = document.createElement('textarea');
-	t.value = txt;
-	document.body.appendChild(t);
-	t.select();
-	document.execCommand('copy');
-	document.body.removeChild(t);
+    navigator.clipboard.writeText(txt).then(() => {
+        console.log(txt);
+        ShowPopup(i18n("Score details copied to clipboard!"))
+    }, (err) => {
+        console.log(err);
+        ShowPopup(i18n("Unable to copy score detail to clipboard, check console for more info."), "danger")
+    });
 }
-const ShowScoreCardPopup = () => {
-    const p = document.querySelector("div.js-portal");
-    if(!p) return;
-    document.body.append(
-        HTML("div", {class: "score-card-popup-window"},
-            HTML("div", {class: "score-card-popup-menu"},
-                HTML("button", {class: "score-card-close-button", eventListener: {type: "click", listener: CloseScoreCardPopup}}),
-                HTML("button", {class: "score-card-copy-to-clipboard-button", ev}),
-            ),
-            HTML("div", {class: "score-card"},
-            )
-        )
-    );
-};
 const MakeTextDetail = (data) => {
     let detail = "";
     const s = data.statistics; const m = data.maximum_statistics; const b = data.beatmap;
@@ -1524,9 +1541,7 @@ const CopyDetailsPopup = () => {
     const id = ele.dataset.replayId;
     const data = messageCache.get(Number(id)); if(!data) return;
     const msg = MakeTextDetail(data);
-    console.log(msg);
     CopyToClipboard(msg);
-    ShowPopup(i18n("Score details copied to clipboard!"));
 };
 const AddPopupButton = () => {
     const p = document.querySelector("div.js-portal")?.querySelector("div.simple-menu");
