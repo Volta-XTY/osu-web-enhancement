@@ -1147,7 +1147,8 @@ const TopRanksWorker = (userId, modestr, addedNodes = [document.body]) => {
     addedNodes.forEach((eles) => {
         if(eles instanceof Element) eles.querySelectorAll(":scope div.play-detail.play-detail--highlightable").forEach((ele) => {
             if(ele.getAttribute("improved") !== null) return;
-            const a = ele.querySelector(":scope time.js-timeago");
+            let a = ele.querySelector(":scope time.js-timeago");
+            if(a === null) a = ele.querySelector(":scope time.timeago")
             const t = a.getAttribute("datetime");
             const data = messageCache.get(`${userId},${modestr},${subdomain},${t}`);
             if(data){
