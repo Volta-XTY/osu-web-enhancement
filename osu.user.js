@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.6.12
+// @version 0.6.13
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -1148,6 +1148,7 @@ const TopRanksWorker = (userId, modestr, addedNodes = [document.body]) => {
         if(eles instanceof Element) eles.querySelectorAll(":scope div.play-detail.play-detail--highlightable").forEach((ele) => {
             if(ele.getAttribute("improved") !== null) return;
             let a = ele.querySelector(":scope time.js-timeago");
+            // add support for osu!plus by @RealStr1ke
             if(a === null) a = ele.querySelector(":scope time.timeago")
             const t = a.getAttribute("datetime");
             const data = messageCache.get(`${userId},${modestr},${subdomain},${t}`);
