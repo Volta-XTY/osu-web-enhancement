@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.6.13
+// @version 0.6.14
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -477,7 +477,8 @@ const locales = {
             "pp Accuracy": "pp Accuracy",
             "V1 Accuracy": "V1 Accuracy",
             "V2 Accuracy": "V2 Accuracy",
-            "Lazer Accuracy": "Lazer Accuracy",
+            "Lazer Mode Accuracy": "Lazer Mode Accuracy",
+            "Stable Mode Accuracy": "Stable Mode Accuracy",
             "Combo": "Combo",
             "Combo/Max Combo": "Combo/Max Combo",
             "Import osu!.db": "Import osu!.db",
@@ -507,6 +508,8 @@ const locales = {
             "V1 Accuracy": "V1-准确度",
             "V2 Accuracy": "V2-准确度",
             "Lazer Accuracy": "Lazer-准确度",
+            "Lazer Mode Accuracy": "Lazer准确度",
+            "Stable Mode Accuracy": "Stable准确度",
             "Combo": "连击数",
             "Combo/Max Combo": "连击数/最大连击数",
             "Import osu!.db": "读取 osu!.db",
@@ -1131,9 +1134,13 @@ const PPGiniIndex = () => {
     const SAB = vals[0] / 2 * vals.length;
     ShowPopup(i18n("Your pp Gini index of bp%{bp} is %{val}.", {bp: vals.length, val: (1 - SB/SAB).toPrecision(6)}));
 }
+const IsLazer = () => {
+    if(document.querySelector("button[data-url=\"https://osu.ppy.sh/home/account/options?user_profile_customization%5Blegacy_score_only%5D=1\"] span.fas")) return true;
+    else return false;
+}
 const TopRanksWorker = (userId, modestr, addedNodes = [document.body]) => {
-    const isLazer = window.location.hostname.split(".")[0] === "lazer"; // assume that hostname can only be osu.ppy.sh or lazer.ppy.sh
-    const subdomain = isLazer ? "lazer": "osu";
+    const isLazer = IsLazer();
+    const subdomain = "osu"; // This line was const subdomain = isLazer ? "lazer": "osu"; now lazer.ppy.sh is no longer in use.
     const sectionNames = new Set();
     const GetSection = (ele) => {
         let count = 0;
@@ -1176,6 +1183,7 @@ const CustomToPrecision = (number, precision) => {
     return number >= 1 ? number.toPrecision(precision) : (number < (10 ** (-precision + 1) / 2) ? 0 : number.toFixed(precision - 1));
 } 
 const ListItemWorker = (ele, data, isLazer) => {
+    console.log(isLazer);
     if(ele.getAttribute("improved") !== null) return;
     ele.setAttribute("improved", "");
     ele.setAttribute("data-replay-id", data.id);
@@ -1214,7 +1222,7 @@ const ListItemWorker = (ele, data, isLazer) => {
         case 0:{
             du.replaceChildren(
                 HTML("span", {class: "play-detail__before"}),
-                HTML("span", {class: "play-detail__Accuracy", title: i18n(`${isLazer ? "Lazer" : "V1"} Accuracy`)}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
+                HTML("span", {class: "play-detail__Accuracy", title: i18n(`${isLazer ? "Lazer Mode" : "Stable Mode"} Accuracy`)}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
                 HTML("span", {class: "play-detail__combo", title: i18n(`Combo${isLazer ? "/Max Combo" : ""}`)},
                     HTML("span", {class: `combo ${isLazer ?(data.max_combo === (data.maximum_statistics.great ?? 0) + (data.maximum_statistics.legacy_combo_increase ?? 0) ? "legacy-perfect-combo" : ""):(data.legacy_perfect ? "legacy-perfect-combo" : "")}`}, HTML(`${data.max_combo}`)),
                     isLazer ? HTML("/") : null,
@@ -1262,7 +1270,7 @@ const ListItemWorker = (ele, data, isLazer) => {
             const mx = cur[0] + cur[1] + cur[2];
             du.replaceChildren(
                 HTML("span", {class: "play-detail__before"}),
-                HTML("span", {class: "play-detail__Accuracy", title: i18n(`${isLazer ? "Lazer" : "V1"} Accuracy`)}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
+                HTML("span", {class: "play-detail__Accuracy", title: i18n(`${isLazer ? "Lazer Mode" : "Stable Mode"} Accuracy`)}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
                 HTML("span", {class: "play-detail__combo", title: i18n(`Combo/Max Combo`)},
                     HTML("span", {class: `combo ${(data.max_combo === mx ? "legacy-perfect-combo" : "")}`}, HTML(`${data.max_combo}`)),
                     HTML("/"),
@@ -1292,7 +1300,7 @@ const ListItemWorker = (ele, data, isLazer) => {
                 const mx = [data.maximum_statistics.great ?? 0, data.maximum_statistics.large_tick_hit ?? 0, data.maximum_statistics.small_tick_hit ?? 0];
                 du.replaceChildren(
                     HTML("span", {class: "play-detail__before"}),
-                    HTML("span", {class: "play-detail__Accuracy", title: i18n(`Lazer Accuracy`)}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
+                    HTML("span", {class: "play-detail__Accuracy", title: i18n(`Lazer Mode Accuracy`)}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
                     HTML("span", {class: "play-detail__combo", title: i18n(`Combo/Max Combo`)},
                         HTML("span", {class: `combo ${(data.max_combo === mx[0] + mx[1] ? "legacy-perfect-combo" : "")}`}, HTML(`${data.max_combo}`)),
                         HTML("/"),
@@ -1317,7 +1325,7 @@ const ListItemWorker = (ele, data, isLazer) => {
             } else {
                 du.replaceChildren(
                     HTML("span", {class: "play-detail__before"}),
-                    HTML("span", {class: "play-detail__Accuracy", title: i18n(`V1 Accuracy`)}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
+                    HTML("span", {class: "play-detail__Accuracy", title: i18n(`Stable Mode Accuracy`)}, HTML(`${(data.accuracy * 100).toFixed(2)}%`)),
                     HTML("span", {class: "play-detail__combo", title: i18n(`Combo`)},
                         HTML("span", {class: ""}, HTML(`${data.max_combo}`)),
                         HTML("x")
@@ -1347,12 +1355,15 @@ const ListItemWorker = (ele, data, isLazer) => {
         case 3:{
             const ppAcc = (320*data.statistics.perfect+300*data.statistics.great+200*data.statistics.good+100*data.statistics.ok+50*data.statistics.meh)/(320*(data.statistics.perfect+data.statistics.great+data.statistics.good+data.statistics.ok+data.statistics.meh+data.statistics.miss));
             const v2Acc = (305*data.statistics.perfect+300*data.statistics.great+200*data.statistics.good+100*data.statistics.ok+50*data.statistics.meh)/(305*(data.statistics.perfect+data.statistics.great+data.statistics.good+data.statistics.ok+data.statistics.meh+data.statistics.miss));
+            const v1Acc = (300*data.statistics.perfect+300*data.statistics.great+200*data.statistics.good+100*data.statistics.ok+50*data.statistics.meh)/(300*(data.statistics.perfect+data.statistics.great+data.statistics.good+data.statistics.ok+data.statistics.meh+data.statistics.miss));
             const MCombo = (data.maximum_statistics.perfect ?? 0) + (data.maximum_statistics.legacy_combo_increase ?? 0);
             const isMCombo = isLazer ? data.max_combo >= MCombo : data.legacy_perfect;
             du.replaceChildren(
                 HTML("span", {class: "play-detail__before"}),
                 HTML("span", {class: "play-detail__Accuracy2", title: i18n(`pp Accuracy`)}, HTML(`${(ppAcc * 100).toFixed(2)}%`)),
-                HTML("span", {class: "play-detail__Accuracy", title: i18n(`V2 Accuracy`)}, HTML(`${(((data.rank === "D" && data.accuracy === 0) ? v2Acc :data.accuracy) * 100).toFixed(2)}%`)),
+                isLazer ? 
+                HTML("span", {class: "play-detail__Accuracy", title: i18n(`Lazer Mode Accuracy`)}, HTML(`${(((data.rank === "D" && data.accuracy === 0) ? v2Acc : data.accuracy) * 100).toFixed(2)}%`)):
+                HTML("span", {class: "play-detail__Accuracy", title: i18n(`Stable Mode Accuracy`)}, HTML(`${(((data.rank === "D" && data.accuracy === 0) ? v1Acc : v1Acc) * 100).toFixed(2)}%`)),
                 HTML("span", {class: "play-detail__combo", title: i18n(`Combo${isLazer ? "/Max Combo" : ""}`)},
                     HTML("span", {class: `combo ${isMCombo ? "legacy-perfect-combo" : ""}`}, HTML(`${data.max_combo}`)),
                     isLazer ? HTML("/") : null,
@@ -1507,7 +1518,7 @@ const MakeTextDetail = (data) => {
     let detail = "";
     const s = data.statistics; const m = data.maximum_statistics; const b = data.beatmap;
     const secToMin = (t) => `${Math.floor(t/60)}:${String(t%60).padStart(2, '0')}`;
-    const isLazer = window.location.hostname.split(".")[0] === "lazer"; // assume that hostname can only be osu.ppy.sh or lazer.ppy.sh
+    const isLazer = IsLazer();
     switch(data.ruleset_id){
         case 0: detail = 
 `${(s.great ?? 0) + (s.perfect ?? 0)}-${(s.ok ?? 0) + (s.good ?? 0)}-${s.meh ?? 0}-${s.miss ?? 0} ${data.max_combo ?? 0}${isLazer ? `/${(m.great ?? 0) + (m.legacy_combo_increase ?? 0)}` : ""}x
