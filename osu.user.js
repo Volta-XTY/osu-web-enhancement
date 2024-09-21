@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name osu!web enhancement
 // @namespace http://tampermonkey.net/
-// @version 0.6.14
+// @version 0.7.0
 // @description Some small improvements to osu!web, featuring beatmapset filter and profile page improvement.
 // @author VoltaXTY
 // @match https://osu.ppy.sh/*
@@ -905,6 +905,40 @@ const SelectOsuDb = (event) => {
     console.assert(l && l.length === 1, "No file or multiple files are selected.");
     ReadOsuDb(l[0]);
 };
+let osuAccessToken = "";
+let osuAccessTokenExpireTime = 0;
+let lock = false;
+let queue = [];
+const clientID = 34956;
+const clientSecret = "PKT6PQoydMhjFq9jNRCJsIUV9hSXfQ7PPEiWmg7J";
+const GetToken = async () => {
+    if(!lock){
+        lock = true;
+        if(osuAccessToken === "" || new Date().getTime() > osuAccessTokenExpireTime){
+            const response = await fetch("https://osu.ppy.sh/oauth/token", {
+                method: "POST",
+                body: new URLSearchParams([
+                    ["client_id", clientID],
+                    ["client_secret", clientSecret],
+                    ["grant_type", "client_credentials"],
+                    ["scope", "public"],
+                ]),
+            });
+            const responseData = await response.json();
+            osuAccessToken = responseData.access_token;
+            osuAccessTokenExpireTime = new Date().getTime() + responseData.expires_in * 1000;
+        }
+        lock = false;
+        let resolve;
+        while(resolve = queue.shift()) resolve();
+    }
+    else{
+        const {promise, resolve, reject} = Promise.withResolvers();
+        queue.push(resolve);
+        await promise;
+    }
+    return osuAccessToken;
+}
 const CheckForUpdate = () => {
     const verReg = /<dd class="script-show-version"><span>([0-9\.]+)<\/span><\/dd>/;
     fetch("https://greasyfork.org/en/scripts/475417-osu-web-enhancement", {
@@ -1202,10 +1236,28 @@ const ListItemWorker = (ele, data, isLazer) => {
     const db = detail.children[1];
     data.statistics.perfect ??= 0, data.statistics.great ??= 0, data.statistics.good ??= 0, data.statistics.ok ??= 0, data.statistics.meh ??= 0, data.statistics.miss ??= 0;
     const bmName = ele.querySelector("span.play-detail__beatmap");
-    const sr = HTML("div", {class: `difficulty-badge ${data.beatmap.difficulty_rating >= 6.5 ? "difficulty-badge--expert-plus" : ""}`, style: `--bg: ${DiffToColour(data.beatmap.difficulty_rating)}`},
-        HTML("span", {class: "difficulty-badge__icon"}, HTML("span", {class: "fas fa-star"})),
-        HTML("span", {class: "difficulty-badge__rating"}, HTML(`${data.beatmap.difficulty_rating.toFixed(2)}`))
-    );
+    GetToken().then(async (token) => {
+        const body = {
+            mods: data.mods.map((modObj) => modObj.acronym),
+            ruleset_id: data.ruleset_id,
+        };
+        const response = await fetch(`https://osu.ppy.sh/api/v2/beatmaps/${data.beatmap.id}/attributes`,{
+            method: "POST",
+            body: JSON.stringify(body),
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            }
+        });
+        const attributes = (await response.json()).attributes;
+        console.log(body, attributes);
+        const starRatingElement = HTML("div", {class: `difficulty-badge ${attributes.star_rating >= 6.5 ? "difficulty-badge--expert-plus" : ""}`, style: `--bg: ${DiffToColour(attributes.star_rating)}`},
+            HTML("span", {class: "difficulty-badge__icon"}, HTML("span", {class: "fas fa-star"})),
+            HTML("span", {class: "difficulty-badge__rating"}, HTML(`${attributes.star_rating.toFixed(2)}`))
+        );
+        bmName.parentElement.insertBefore(starRatingElement, bmName);
+    })
     /*
     const ic = ele;
     ic.classList.add("audio-player", "js-audio--player");
@@ -1214,7 +1266,6 @@ const ListItemWorker = (ele, data, isLazer) => {
     const gr = ele;
     gr.classList.add("audio-player__button", "audio-player__button--play", "js-audio--play");
     */
-    bmName.parentElement.insertBefore(sr, bmName);
     const bma = ele.querySelector("a.play-detail__title");
     // const modeName = ["STD", "TAIKO", "CTB", "MANIA"];
     bma.onclick = (e) => {e.stopPropagation();};
@@ -1474,14 +1525,6 @@ const ImproveProfile = (mulist) => {
     if(mulist !== undefined) mulist.forEach((record) => {
         if(record.type === "childList" && record.addedNodes) TopRanksWorker(userId, modestr, record.addedNodes);
     });
-}
-let wloc = "";
-const WindowLocationChanged = () => {
-    if(window.location !== wloc){
-        wloc = window.location;
-        return true;
-    }
-    else return false;
 }
 const InsertStyleSheet = () => {
     //const sheetId = "osu-web-enhancement-general-stylesheet";
