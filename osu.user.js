@@ -708,6 +708,7 @@ const ULEB128 = (arr, iter) => {
 };
 const Single = (arr, iter) => { const r = new DataView(arr.buffer, iter.nxtpos, 4).getFloat32(0, true); iter.nxtpos += 4; return r; };
 const Double = (arr, iter) => { const r = new DataView(arr.buffer, iter.nxtpos, 8).getFloat64(0, true); iter.nxtpos += 8; return r; };
+const Float = (arr, iter) => { const r = new DataView(arr.buffer, iter.nxtpos, 4).getFloat32(0, true); iter.nxtpos += 4; return r; };
 const Boolean = (arr, iter) => { return arr[iter.nxtpos++] !== 0x00; };
 const OString = (arr, iter) => {
     let value = "";
@@ -723,6 +724,22 @@ const OString = (arr, iter) => {
         default: console.assert(false, `error occurred while parsing osu string with the first byte.`);
     }
     return value;
+};
+const IntFloat = (arr, iter) => {
+    const r = {int: 0, float: 0};
+    const m1 = arr[iter.nxtpos++];
+    console.assert(m1 === 0x08, `error occurred while parsing Int-Float pair at ${iter.nxtpos - 1} with value 0x${m1.toString(16)}: should be 0x8.`);
+    r.int = Int(arr, iter);
+    const m2 = arr[iter.nxtpos++];
+    console.assert(m2 === 0x0c, `error occurred while parsing Int-Float pair at ${iter.nxtpos - 1} with value 0x${m1.toString(16)}: should be 0xc.`);
+    // r.double = Double(arr, iter);
+    r.float = Float(arr, iter);
+    return r;
+};
+const IntFloatArray = (arr, iter) => {
+    const r = new Array(Int(arr, iter));
+    for(let i = 0; i < r.length; i++) r[i] = IntFloat(arr, iter);
+    return r;
 };
 const IntDouble = (arr, iter) => {
     const r = {int: 0, double: 0};
@@ -774,10 +791,10 @@ const Beatmap = (arr, iter) => {
         HP: iter.osuVersion < 20140609 ? Byte(arr, iter) : Single(arr, iter),
         OD: iter.osuVersion < 20140609 ? Byte(arr, iter) : Single(arr, iter),
         sliderVelocity: Double(arr, iter),
-        osuSRInfoArr: (iter.osuVersion >= 20140609) ? IntDoubleArray(arr, iter) : undefined,
-        taikoSRInfoArr: (iter.osuVersion >= 20140609) ? IntDoubleArray(arr, iter) : undefined,
-        catchSRInfoArr: (iter.osuVersion >= 20140609) ? IntDoubleArray(arr, iter) : undefined,
-        maniaSRInfoArr: (iter.osuVersion >= 20140609) ? IntDoubleArray(arr, iter) : undefined,
+        osuSRInfoArr: (iter.osuVersion >= 20250107) ? IntFloatArray(arr, iter) : ((iter.osuVersion >= 20140609) ? IntDoubleArray(arr, iter) : undefined),
+        taikoSRInfoArr: (iter.osuVersion >= 20250107) ? IntFloatArray(arr, iter) : ((iter.osuVersion >= 20140609) ? IntDoubleArray(arr, iter) : undefined),
+        catchSRInfoArr: (iter.osuVersion >= 20250107) ? IntFloatArray(arr, iter) : ((iter.osuVersion >= 20140609) ? IntDoubleArray(arr, iter) : undefined),
+        maniaSRInfoArr: (iter.osuVersion >= 20250107) ? IntFloatArray(arr, iter) : ((iter.osuVersion >= 20140609) ? IntDoubleArray(arr, iter) : undefined),
         drainTime: Int(arr, iter),
         totalTime: Int(arr, iter),
         audioPreviewTime: Int(arr, iter),
