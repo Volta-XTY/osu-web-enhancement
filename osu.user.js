@@ -1236,28 +1236,15 @@ const ListItemWorker = (ele, data, isLazer) => {
     const db = detail.children[1];
     data.statistics.perfect ??= 0, data.statistics.great ??= 0, data.statistics.good ??= 0, data.statistics.ok ??= 0, data.statistics.meh ??= 0, data.statistics.miss ??= 0;
     const bmName = ele.querySelector("span.play-detail__beatmap");
-    GetToken().then(async (token) => {
-        const body = {
-            mods: data.mods.map((modObj) => modObj.acronym),
-            ruleset_id: data.ruleset_id,
-        };
-        const response = await fetch(`https://osu.ppy.sh/api/v2/beatmaps/${data.beatmap.id}/attributes`,{
-            method: "POST",
-            body: JSON.stringify(body),
-            headers: {
-                "Authorization": `Bearer ${token}`,
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-            }
-        });
-        const attributes = (await response.json()).attributes;
-        console.log(body, attributes);
-        const starRatingElement = HTML("div", {class: `difficulty-badge ${attributes.star_rating >= 6.5 ? "difficulty-badge--expert-plus" : ""}`, style: `--bg: ${DiffToColour(attributes.star_rating)}`},
-            HTML("span", {class: "difficulty-badge__icon"}, HTML("span", {class: "fas fa-star"})),
-            HTML("span", {class: "difficulty-badge__rating"}, HTML(`${attributes.star_rating.toFixed(2)}`))
-        );
-        bmName.parentElement.insertBefore(starRatingElement, bmName);
-    })
+
+    const starRating = data.beatmap.difficulty_rating;
+
+    const starRatingElement = HTML("div", {class: `difficulty-badge ${starRating >= 6.5 ? "difficulty-badge--expert-plus" : ""}`, style: `--bg: ${DiffToColour(starRating)}`},
+        HTML("span", {class: "difficulty-badge__icon"}, HTML("span", {class: "fas fa-star"})),
+        HTML("span", {class: "difficulty-badge__rating"}, HTML(`${starRating.toFixed(2)}`))
+    );
+    bmName.parentElement.insertBefore(starRatingElement, bmName);
+
     /*
     const ic = ele;
     ic.classList.add("audio-player", "js-audio--player");
@@ -1502,7 +1489,7 @@ const ImproveProfile = (mulist) => {
     const wloc = window.location.toString();
     if(!profUrlReg.test(wloc)) return;
     //SortGroup.Show();
-    const initDataEle = document.querySelector(".js-react--profile-page.osu-layout.osu-layout--full");
+    const initDataEle = document.querySelector(".js-react.u-contents");
     if(!initDataEle) return;
     const initData = JSON.parse(initDataEle.dataset.initialData);
     const userId = initData.user.id, modestr = initData.current_mode;
